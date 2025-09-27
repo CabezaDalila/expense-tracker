@@ -34,7 +34,7 @@ export function ExpenseForm({ expense, onSubmit, onCancel }: ExpenseFormProps) {
     e.preventDefault()
     if (!formData.description || !formData.amount || !formData.due_date) return
 
-    onSubmit({
+    const expenseData: ExpenseInput = {
       description: formData.description,
       amount: Number.parseFloat(formData.amount),
       category: formData.category,
@@ -42,11 +42,18 @@ export function ExpenseForm({ expense, onSubmit, onCancel }: ExpenseFormProps) {
       due_date: formData.due_date,
       notes: formData.notes || undefined,
       payment_code: formData.payment_code || undefined,
-      propagation_months: formData.category === "fijo" 
-        ? (formData.propagation_months === "indefinido" ? "indefinido" : 
-           formData.propagation_months ? Number.parseInt(formData.propagation_months) : 12)
-        : undefined,
-    })
+    }
+
+    // Solo agregar propagation_months si es un gasto nuevo (no editando)
+    if (!expense && formData.category === "fijo") {
+      expenseData.propagation_months = formData.propagation_months === "indefinido" 
+        ? "indefinido" 
+        : formData.propagation_months 
+          ? Number.parseInt(formData.propagation_months) 
+          : 12
+    }
+
+    onSubmit(expenseData)
   }
 
   return (

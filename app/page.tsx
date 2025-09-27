@@ -5,12 +5,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Filter, Home, CreditCard, TrendingDown, Calendar } from "lucide-react"
+import { Plus, Search, Filter, Home, CreditCard, TrendingDown, Calendar, Settings } from "lucide-react"
 import { ExpenseDashboard } from "@/components/expense-dashboard"
 import { ExpenseCard } from "@/components/expense-card"
 import { ExpenseForm } from "@/components/expense-form"
 import { DateFilter } from "@/components/date-filter"
+import { NotificationSettings } from "@/components/notification-settings"
+import { NotificationManager } from "@/components/notification-manager"
+import { InstallPWA } from "@/components/install-pwa"
 import type { Expense, ExpenseInput } from "@/lib/database"
 import { useToast } from "@/hooks/use-toast"
 
@@ -34,6 +38,9 @@ export default function ExpenseTracker() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>()
   const [loading, setLoading] = useState(true)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { toast } = useToast()
 
   const loadExpenses = async (year?: string, month?: string) => {
@@ -201,6 +208,48 @@ export default function ExpenseTracker() {
     setEditingExpense(undefined)
   }
 
+  const handleDeleteClick = (id: number) => {
+    const expense = expenses.find(e => e.id === id)
+    if (expense) {
+      setExpenseToDelete(expense)
+      setDeleteDialogOpen(true)
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!expenseToDelete) return
+
+    try {
+      const response = await fetch(`/api/expenses/${expenseToDelete.id}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        await loadExpenses(selectedYear, selectedMonth)
+        setDeleteDialogOpen(false)
+        setExpenseToDelete(null)
+        toast({
+          title: "Gasto eliminado",
+          description: `${expenseToDelete.description} ha sido eliminado exitosamente.`,
+        })
+      } else {
+        throw new Error("Failed to delete expense")
+      }
+    } catch (error) {
+      console.error("Error deleting expense:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el gasto.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false)
+    setExpenseToDelete(null)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -243,6 +292,9 @@ export default function ExpenseTracker() {
             </Dialog>
           </div>
         </div>
+
+        {/* Manager de notificaciones (invisible) */}
+        <NotificationManager userId="demo-user" />
 
         <Tabs defaultValue="dashboard" className="space-y-4 sm:space-y-6">
           <TabsList className="grid w-full grid-cols-4 h-auto">
@@ -360,6 +412,7 @@ export default function ExpenseTracker() {
                     expense={expense}
                     onStatusChange={handleStatusChange}
                     onEdit={handleEditClick}
+                    onDelete={handleDeleteClick}
                   />
                 ))}
             </div>
@@ -404,6 +457,7 @@ export default function ExpenseTracker() {
                     expense={expense}
                     onStatusChange={handleStatusChange}
                     onEdit={handleEditClick}
+                    onDelete={handleDeleteClick}
                   />
                 ))}
             </div>
@@ -448,11 +502,70 @@ export default function ExpenseTracker() {
                     expense={expense}
                     onStatusChange={handleStatusChange}
                     onEdit={handleEditClick}
+                    onDelete={handleDeleteClick}
                   />
                 ))}
             </div>
           </TabsContent>
+
         </Tabs>
+
+        {/* Footer con botón de configuraciones */}
+        <footer className="mt-12 pt-8 border-t border-slate-700/50">
+          <div className="max-w-6xl mx-auto text-center">
+            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="gap-2 bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
+                >
+                  <Settings className="h-4 w-4" />
+                  Configuración de Notificaciones
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="!w-[calc(100vw-2rem)] !max-w-2xl !left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2 bg-slate-900 border-slate-700 p-4 sm:p-6">
+                <DialogHeader>
+                  <DialogTitle className="text-white card-title flex items-center gap-2">
+                    <Settings className="h-5 w-5 text-blue-400" />
+                    Configuración de Notificaciones
+                  </DialogTitle>
+                </DialogHeader>
+                <NotificationSettings userId="demo-user" />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </footer>
+
+        {/* Diálogo de confirmación para eliminar */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent className="bg-slate-900 border-slate-700">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">¿Eliminar gasto?</AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-300">
+                ¿Estás seguro de que quieres eliminar "{expenseToDelete?.description}"? 
+                Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel 
+                onClick={handleDeleteCancel}
+                className="bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700"
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Componente de instalación PWA */}
+        <InstallPWA />
       </div>
     </div>
   )

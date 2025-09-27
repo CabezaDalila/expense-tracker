@@ -1,0 +1,28 @@
+PODS:
+  - Capacitor (7.4.3):
+    - CapacitorCordova
+  - CapacitorCommunityAppIcon (6.0.0):
+    - Capacitor
+  - CapacitorCordova (7.4.3)
+
+DEPENDENCIES:
+  - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorCommunityAppIcon (from `../../node_modules/@capacitor-community/app-icon`)"
+  - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+
+EXTERNAL SOURCES:
+  Capacitor:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorCommunityAppIcon:
+    :path: "../../node_modules/@capacitor-community/app-icon"
+  CapacitorCordova:
+    :path: "../../node_modules/@capacitor/ios"
+
+SPEC CHECKSUMS:
+  Capacitor: 28d6c01026a9a3f7156529498ec1f389a2a28dbc
+  CapacitorCommunityAppIcon: a937eb756114f0f1aa2de894d23b63db02d042e6
+  CapacitorCordova: 435121e81a2df4d0034f0fb11fcefab5104cfdb5
+
+PODFILE CHECKSUM: e323669088c4e4c786ab707aa95a2ca288243e48
+
+COCOAPODS: 1.16.2

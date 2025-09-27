@@ -158,3 +158,25 @@ export async function getExpenseStats(userId: string, year?: string, month?: str
     upcomingDue: Number.parseInt(stats.upcoming_due),
   }
 }
+
+export async function getExpiringToday(userId: string): Promise<Expense[]> {
+  const expenses = await sql`
+    SELECT * FROM expenses 
+    WHERE user_id = ${userId}
+    AND status = 'pendiente'
+    AND due_date = CURRENT_DATE
+    ORDER BY amount DESC
+  `
+  return expenses as Expense[]
+}
+
+export async function getExpiringTomorrow(userId: string): Promise<Expense[]> {
+  const expenses = await sql`
+    SELECT * FROM expenses 
+    WHERE user_id = ${userId}
+    AND status = 'pendiente'
+    AND due_date = CURRENT_DATE + INTERVAL '1 day'
+    ORDER BY amount DESC
+  `
+  return expenses as Expense[]
+}

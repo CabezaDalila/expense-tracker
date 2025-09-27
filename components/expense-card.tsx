@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, CreditCard, DollarSign, CheckCircle, Clock, Copy, Check } from "lucide-react"
+import { Calendar, CreditCard, DollarSign, CheckCircle, Clock, Copy, Check, Trash2 } from "lucide-react"
 import { useState } from "react"
 import type { Expense } from "@/lib/database"
 
@@ -11,9 +11,10 @@ interface ExpenseCardProps {
   expense: Expense
   onStatusChange: (id: number, status: Expense["status"]) => void
   onEdit: (expense: Expense) => void
+  onDelete: (id: number) => void
 }
 
-export function ExpenseCard({ expense, onStatusChange, onEdit }: ExpenseCardProps) {
+export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete }: ExpenseCardProps) {
   const [copied, setCopied] = useState(false)
 
   const formatCurrency = (amount: number) => {
@@ -136,6 +137,15 @@ export function ExpenseCard({ expense, onStatusChange, onEdit }: ExpenseCardProp
             )}
             <Button size="sm" variant="outline" onClick={() => onEdit(expense)} className="flex-1">
               Editar
+            </Button>
+            <Button 
+              size="sm" 
+              variant="destructive" 
+              onClick={() => onDelete(expense.id)}
+              className="px-3"
+              title="Eliminar gasto"
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </div>
