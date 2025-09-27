@@ -25,25 +25,49 @@ export function InstallPWA() {
     // Verificar si ya está instalada
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setShowInstallButton(false)
+      return
     }
+
+    // Verificar si la app ya fue instalada anteriormente (iOS)
+    if ((window.navigator as any).standalone === true) {
+      setShowInstallButton(false)
+      return
+    }
+
+    // Para navegadores que no soportan beforeinstallprompt, mostrar el botón manualmente
+    // después de un pequeño delay para dar tiempo a que se cargue la página
+    const timer = setTimeout(() => {
+      // Solo mostrar si no es iOS (que maneja la instalación de forma diferente)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      if (!isIOS && !deferredPrompt) {
+        setShowInstallButton(true)
+      }
+    }, 3000)
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      clearTimeout(timer)
     }
-  }, [])
+  }, [deferredPrompt])
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return
-
-    deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-    
-    if (outcome === 'accepted') {
-      console.log('PWA instalada')
-      setShowInstallButton(false)
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      
+      if (outcome === 'accepted') {
+        console.log('PWA instalada')
+        setShowInstallButton(false)
+      }
+      
+      setDeferredPrompt(null)
+    } else {
+      // Instalación manual - mostrar instrucciones
+      alert('Para instalar esta aplicación:\n\n' +
+            'Chrome/Edge: Haz clic en el menú ⋮ → "Instalar [nombre de la app]"\n' +
+            'Safari (iOS): Toca el botón Compartir → "Agregar a pantalla de inicio"\n' +
+            'Firefox: Haz clic en el menú ⋯ → "Instalar"')
     }
-    
-    setDeferredPrompt(null)
   }
 
   const handleDismiss = () => {
