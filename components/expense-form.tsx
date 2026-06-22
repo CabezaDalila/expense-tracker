@@ -7,32 +7,47 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
+import { Home, CreditCard, TrendingDown, Repeat, Paperclip, FileText, X, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import type { Expense, ExpenseInput } from "@/lib/database"
+
+const MAX_RECEIPT_MB = 4
 
 interface ExpenseFormProps {
   expense?: Expense
-  onSubmit: (expense: ExpenseInput) => void
+  onSubmit: (expense: ExpenseInput) => void | Promise<void>
   onCancel: () => void
 }
 
+const categories = [
+  { value: "fijo", label: "Fijo", icon: Home, accent: "blue" },
+  { value: "tarjeta", label: "Tarjeta", icon: CreditCard, accent: "amber" },
+  { value: "variable", label: "Variable", icon: TrendingDown, accent: "purple" },
+] as const
+
 export function ExpenseForm({ expense, onSubmit, onCancel }: ExpenseFormProps) {
+  const { toast } = useToast()
   const [formData, setFormData] = useState({
     description: expense?.description || "",
     amount: expense?.amount?.toString() || "",
     category: expense?.category || ("fijo" as const),
     status: expense?.status || ("pendiente" as const),
-    due_date: expense?.due_date ? expense.due_date.split("T")[0] : "",
+    due_date: expense?.due_date ? expense.due_date.split("T")[0] : new Date().toLocaleDateString("en-CA"),
     notes: expense?.notes || "",
     propagation_months: "12" as string,
-    payment_code: expense?.payment_code || ""
+    payment_code: expense?.payment_code || "",
   })
-  
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Adjuntos: comprobante de pago y factura
+  const [receipt, setReceipt] = useState<{ data: string | null; name: string | null }>({ data: null, name: null })
+  const [invoice, setInvoice] = useState<{ data: string | null; name: string | null }>({ data: null, name: null })
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.description || !formData.amount || !formData.due_date) return
+    if (submitting) return
 
     const expenseData: ExpenseInput = {
       description: formData.description,
@@ -44,208 +59,289 @@ export function ExpenseForm({ expense, onSubmit, onCancel }: ExpenseFormProps) {
       payment_code: formData.payment_code || undefined,
     }
 
-    // Solo agregar propagation_months si es un gasto nuevo (no editando)
-    if (!expense && formData.category === "fijo") {
-      expenseData.propagation_months = formData.propagation_months === "indefinido" 
-        ? "indefinido" 
-        : formData.propagation_months 
-          ? Number.parseInt(formData.propagation_months) 
-          : 12
+    // Solo enviar adjuntos si se eligió uno nuevo
+    if (receipt.data) {
+      expenseData.receipt_data = receipt.data
+      expenseData.receipt_name = receipt.name
+    }
+    if (invoice.data) {
+      expenseData.invoice_data = invoice.data
+      expenseData.invoice_name = invoice.name
     }
 
-    onSubmit(expenseData)
+    if (!expense && formData.category === "fijo") {
+      expenseData.propagation_months =
+        formData.propagation_months === "indefinido"
+          ? "indefinido"
+          : formData.propagation_months
+            ? Number.parseInt(formData.propagation_months)
+            : 12
+    }
+
+    try {
+      setSubmitting(true)
+      await onSubmit(expenseData)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
+  const inputCls =
+    "h-11 rounded-xl border-slate-700 bg-slate-800/60 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-blue-500/20"
+
   return (
-    <Card className="w-full bg-gradient-to-br from-slate-900 to-slate-800 border-slate-700 shadow-2xl">
-      <CardHeader className="pb-6">
-        <CardTitle className="heading-secondary text-white flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">$</span>
+    <form onSubmit={handleSubmit} className="no-scrollbar max-h-[65vh] space-y-5 overflow-y-auto pr-1">
+      {/* Descripción */}
+      <div className="space-y-1.5">
+        <Label htmlFor="description" className="text-sm text-slate-300">Descripción</Label>
+        <Input
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
+          placeholder="Ej: ICBC, Luz, Cochera..."
+          className={inputCls}
+          required
+          autoFocus
+        />
+      </div>
+
+      {/* Monto */}
+      <div className="space-y-1.5">
+        <Label htmlFor="amount" className="text-sm text-slate-300">Monto</Label>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+          <Input
+            id="amount"
+            type="number"
+            step="0.01"
+            value={formData.amount}
+            onChange={(e) => setFormData((p) => ({ ...p, amount: e.target.value }))}
+            placeholder="0"
+            className={`${inputCls} pl-8 text-lg font-semibold`}
+            required
+          />
+        </div>
+      </div>
+
+      {/* Categoría — selector visual */}
+      <div className="space-y-1.5">
+        <Label className="text-sm text-slate-300">Categoría</Label>
+        <div className="grid grid-cols-3 gap-2">
+          {categories.map(({ value, label, icon: Icon }) => {
+            const active = formData.category === value
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setFormData((p) => ({ ...p, category: value }))}
+                className={`flex flex-col items-center gap-1.5 rounded-xl border py-3 transition-all ${
+                  active
+                    ? "border-blue-500 bg-blue-500/15 text-blue-300"
+                    : "border-slate-700 bg-slate-800/40 text-slate-400 hover:bg-slate-800/70"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-xs font-medium">{label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Propagación (solo gasto fijo nuevo) */}
+      {formData.category === "fijo" && !expense && (
+        <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-800/40 p-4">
+          <div className="flex items-center gap-2 text-slate-300">
+            <Repeat className="h-4 w-4 text-blue-400" />
+            <span className="text-sm font-medium">Repetir mensualmente</span>
           </div>
-          {expense ? "Editar Gasto" : "Nuevo Gasto"}
-        </CardTitle>
-        <p className="text-slate-400 text-fluid-sm">
-          {expense ? "Modifica los detalles del gasto" : "Agrega un nuevo gasto a tu control"}
-        </p>
-      </CardHeader>
-      <CardContent className="max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800 hover:scrollbar-thumb-slate-500">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-3">
-            <Label htmlFor="description" className="text-slate-200 font-medium">Descripción</Label>
+          <div className="flex items-center gap-2">
             <Input
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-              placeholder="Ej: ICBC, Luz, Parquero..."
-              className="bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
-              required
+              type="number"
+              min="1"
+              max="60"
+              value={formData.propagation_months === "indefinido" ? "" : formData.propagation_months}
+              onChange={(e) => setFormData((p) => ({ ...p, propagation_months: e.target.value }))}
+              placeholder="12"
+              className="h-10 w-20 rounded-lg border-slate-600 bg-slate-700/60 text-center text-white"
             />
-          </div>
-
-          <div className="space-y-3">
-            <Label htmlFor="amount" className="text-slate-200 font-medium">Monto</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400">$</span>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                value={formData.amount}
-                onChange={(e) => setFormData((prev) => ({ ...prev, amount: e.target.value }))}
-                placeholder="0.00"
-                className="bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20 pl-8"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Label htmlFor="category" className="text-slate-200 font-medium">Categoría</Label>
-            <Select
-              value={formData.category}
-              onValueChange={(value: any) => setFormData((prev) => ({ ...prev, category: value }))}
+            <span className="text-sm text-slate-400">meses</span>
+            <button
+              type="button"
+              onClick={() =>
+                setFormData((p) => ({ ...p, propagation_months: p.propagation_months === "indefinido" ? "12" : "indefinido" }))
+              }
+              className={`ml-auto rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                formData.propagation_months === "indefinido"
+                  ? "bg-blue-500/20 text-blue-300"
+                  : "bg-slate-700/60 text-slate-400 hover:text-slate-200"
+              }`}
             >
-              <SelectTrigger className="bg-slate-800 border-slate-600 text-white focus:border-blue-500 focus:ring-blue-500/20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-600">
-                <SelectItem value="fijo" className="text-white hover:bg-slate-700">Gastos Fijos</SelectItem>
-                <SelectItem value="variable" className="text-white hover:bg-slate-700">Gastos Variables</SelectItem>
-                <SelectItem value="tarjeta" className="text-white hover:bg-slate-700">Tarjetas de Crédito</SelectItem>
-              </SelectContent>
-            </Select>
+              Indefinido
+            </button>
           </div>
+          <p className="text-xs text-slate-500">Se crea una copia de este gasto cada mes.</p>
+        </div>
+      )}
 
-          {formData.category === "fijo" && (
-            <div className="space-y-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-              <Label className="text-slate-200 font-medium flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                Propagación
-              </Label>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    id="propagation-limited"
-                    name="propagation-type"
-                    checked={formData.propagation_months !== "indefinido"}
-                    onChange={() => setFormData((prev) => ({ ...prev, propagation_months: "12" }))}
-                    className="h-4 w-4 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
-                  />
-                  <Label htmlFor="propagation-limited" className="text-slate-300 font-normal cursor-pointer">
-                    Por un número específico de meses
-                  </Label>
-                </div>
-                
-                {formData.propagation_months !== "indefinido" && (
-                  <div className="ml-7 flex items-center gap-3">
-                    <Input
-                      id="propagation-months"
-                      type="number"
-                      min="1"
-                      max="60"
-                      value={formData.propagation_months}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, propagation_months: e.target.value }))}
-                      placeholder="12"
-                      className="w-20 bg-slate-700 border-slate-600 text-white focus:border-blue-500 focus:ring-blue-500/20"
-                    />
-                    <span className="text-slate-400 text-sm">meses</span>
-                  </div>
-                )}
+      {/* Estado + Fecha en fila */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-sm text-slate-300">Estado</Label>
+          <Select value={formData.status} onValueChange={(v: any) => setFormData((p) => ({ ...p, status: v }))}>
+            <SelectTrigger className={inputCls}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="border-slate-600 bg-slate-800">
+              <SelectItem value="pendiente" className="text-white hover:bg-slate-700">Pendiente</SelectItem>
+              <SelectItem value="pagado" className="text-white hover:bg-slate-700">Pagado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="dueDate" className="text-sm text-slate-300">Vencimiento</Label>
+          <Input
+            id="dueDate"
+            type="date"
+            value={formData.due_date}
+            onChange={(e) => setFormData((p) => ({ ...p, due_date: e.target.value }))}
+            className={inputCls}
+            required
+          />
+        </div>
+      </div>
 
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    id="propagation-indefinite"
-                    name="propagation-type"
-                    checked={formData.propagation_months === "indefinido"}
-                    onChange={() => setFormData((prev) => ({ ...prev, propagation_months: "indefinido" }))}
-                    className="h-4 w-4 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
-                  />
-                  <Label htmlFor="propagation-indefinite" className="text-slate-300 font-normal cursor-pointer">
-                    Indefinidamente (se crean 12 meses por defecto)
-                  </Label>
-                </div>
-              </div>
-              <p className="text-xs text-slate-400">
-                Cuántos meses se repetirá este gasto fijo
-              </p>
-            </div>
+      {/* Notas */}
+      <div className="space-y-1.5">
+        <Label htmlFor="notes" className="text-sm text-slate-300">Notas <span className="text-slate-500">(opcional)</span></Label>
+        <Textarea
+          id="notes"
+          value={formData.notes}
+          onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
+          placeholder="Notas adicionales..."
+          rows={2}
+          className="rounded-xl border-slate-700 bg-slate-800/60 text-white placeholder-slate-500 focus:border-blue-500"
+        />
+      </div>
+
+      {/* Código de pago */}
+      <div className="space-y-1.5">
+        <Label htmlFor="payment_code" className="text-sm text-slate-300">Código de pago <span className="text-slate-500">(opcional)</span></Label>
+        <Input
+          id="payment_code"
+          value={formData.payment_code}
+          onChange={(e) => setFormData((p) => ({ ...p, payment_code: e.target.value }))}
+          placeholder="CBU, Alias, QR..."
+          className={inputCls}
+        />
+      </div>
+
+      {/* Adjuntos */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <AttachmentField
+          label="Comprobante de pago"
+          value={receipt}
+          onChange={setReceipt}
+          hasExisting={!!expense?.has_receipt}
+          onTooBig={() => toast({ title: "Archivo muy grande", description: `No puede superar ${MAX_RECEIPT_MB} MB.`, variant: "destructive" })}
+        />
+        <AttachmentField
+          label="Factura"
+          value={invoice}
+          onChange={setInvoice}
+          hasExisting={!!expense?.has_invoice}
+          onTooBig={() => toast({ title: "Archivo muy grande", description: `No puede superar ${MAX_RECEIPT_MB} MB.`, variant: "destructive" })}
+        />
+      </div>
+
+      {/* Botones */}
+      <div className="flex gap-3 pt-2">
+        <Button
+          type="submit"
+          disabled={submitting}
+          className="flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 py-5 font-semibold text-white shadow-lg transition-all hover:from-blue-500 hover:to-blue-600 active:scale-[0.98] disabled:from-slate-600 disabled:to-slate-600 disabled:opacity-70 disabled:active:scale-100"
+        >
+          {submitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {expense ? "Guardando..." : "Creando..."}
+            </span>
+          ) : (
+            expense ? "Guardar cambios" : "Crear gasto"
           )}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={submitting}
+          className="rounded-xl border-slate-700 bg-slate-800/60 px-6 py-5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-white disabled:opacity-50"
+        >
+          Cancelar
+        </Button>
+      </div>
+    </form>
+  )
+}
 
-          <div className="space-y-3">
-            <Label htmlFor="status" className="text-slate-200 font-medium">Estado</Label>
-            <Select
-              value={formData.status}
-              onValueChange={(value: any) => setFormData((prev) => ({ ...prev, status: value }))}
-            >
-              <SelectTrigger className="bg-slate-800 border-slate-600 text-white focus:border-blue-500 focus:ring-blue-500/20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-600">
-                <SelectItem value="pendiente" className="text-white hover:bg-slate-700">Pendiente</SelectItem>
-                <SelectItem value="pagado" className="text-white hover:bg-slate-700">Pagado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+type AttachmentValue = { data: string | null; name: string | null }
 
-          <div className="space-y-3">
-            <Label htmlFor="dueDate" className="text-slate-200 font-medium">Fecha de Vencimiento</Label>
-            <Input
-              id="dueDate"
-              type="date"
-              value={formData.due_date}
-              onChange={(e) => setFormData((prev) => ({ ...prev, due_date: e.target.value }))}
-              className="bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
-              required
-            />
-          </div>
+function AttachmentField({
+  label,
+  value,
+  onChange,
+  hasExisting,
+  onTooBig,
+}: {
+  label: string
+  value: AttachmentValue
+  onChange: (v: AttachmentValue) => void
+  hasExisting: boolean
+  onTooBig: () => void
+}) {
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > MAX_RECEIPT_MB * 1024 * 1024) {
+      onTooBig()
+      e.target.value = ""
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => onChange({ data: reader.result as string, name: file.name })
+    reader.readAsDataURL(file)
+  }
 
-          <div className="space-y-3">
-            <Label htmlFor="notes" className="text-slate-200 font-medium">Notas (opcional)</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-              placeholder="Notas adicionales..."
-              rows={2}
-              className="bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
-            />
-          </div>
+  const showFile = value.name || hasExisting
 
-          <div className="space-y-3">
-            <Label htmlFor="payment_code" className="text-slate-200 font-medium">Código de Pago (opcional)</Label>
-            <Input
-              id="payment_code"
-              value={formData.payment_code}
-              onChange={(e) => setFormData((prev) => ({ ...prev, payment_code: e.target.value }))}
-              placeholder="Ej: CBU, Alias, QR, etc."
-              className="bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
-            />
-            <p className="text-xs text-slate-400">
-              Código para realizar el pago (CBU, Alias, código QR, etc.)
-            </p>
-          </div>
-
-          <div className="flex gap-3 pt-6">
-            <Button 
-              type="submit" 
-              className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2.5 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl button-text"
-            >
-              {expense ? "Actualizar" : "Crear"} Gasto
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onCancel} 
-              className="flex-1 bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white py-2.5 rounded-lg transition-all duration-200 button-text"
-            >
-              Cancelar
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-sm text-slate-300">{label} <span className="text-slate-500">(opcional)</span></Label>
+      {showFile ? (
+        <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2.5">
+          <FileText className="h-4 w-4 shrink-0 text-blue-400" />
+          <span className="flex-1 truncate text-sm text-slate-200">
+            {value.name || "Archivo guardado"}
+            {!value.data && hasExisting && <span className="ml-1 text-xs text-slate-500">(guardado)</span>}
+          </span>
+          {value.data ? (
+            <button type="button" onClick={() => onChange({ data: null, name: null })} className="shrink-0 text-slate-400 transition-colors hover:text-red-400" title="Quitar">
+              <X className="h-4 w-4" />
+            </button>
+          ) : (
+            <label className="shrink-0 cursor-pointer text-blue-400 transition-colors hover:text-blue-300" title="Reemplazar">
+              <Paperclip className="h-4 w-4" />
+              <input type="file" accept="image/*,application/pdf" onChange={handleFile} className="hidden" />
+            </label>
+          )}
+        </div>
+      ) : (
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-600 bg-slate-800/40 px-3 py-3 text-sm text-slate-400 transition-colors hover:border-blue-500 hover:text-slate-200">
+          <Paperclip className="h-4 w-4" />
+          Subir foto o PDF
+          <input type="file" accept="image/*,application/pdf" onChange={handleFile} className="hidden" />
+        </label>
+      )}
+    </div>
   )
 }

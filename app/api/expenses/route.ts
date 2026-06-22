@@ -1,18 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 import { getExpenses, createExpense, type ExpenseInput } from "@/lib/database"
 import { initializeDatabase } from "@/lib/init-database"
 
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return NextResponse.json({ error: "No autenticado" }, { status: 401 })
+  if (!session.user.householdId) return NextResponse.json({ error: "Sin hogar configurado" }, { status: 403 })
+
   try {
     await initializeDatabase()
-
-    // For now, using demo-user to match sample data - you'll integrate with Clerk later
-    const userId = "demo-user"
     const { searchParams } = new URL(request.url)
-    const year = searchParams.get('year') || undefined
-    const month = searchParams.get('month') || undefined
-    
-    const expenses = await getExpenses(userId, year, month)
+    const year = searchParams.get("year") || undefined
+    const month = searchParams.get("month") || undefined
+    const expenses = await getExpenses(session.user.householdId, year, month)
     return NextResponse.json(expenses)
   } catch (error) {
     console.error("Error fetching expenses:", error)
@@ -21,20 +23,17 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return NextResponse.json({ error: "No autenticado" }, { status: 401 })
+  if (!session.user.householdId) return NextResponse.json({ error: "Sin hogar configurado" }, { status: 403 })
+
   try {
     await initializeDatabase()
-
-    const userId = "demo-user"
     const expenseData: ExpenseInput = await request.json()
-    
-    console.log("Creating expense with data:", expenseData)
-
-    const newExpense = await createExpense(userId, expenseData)
-    console.log("Expense created successfully:", newExpense)
+    const newExpense = await createExpense(session.user.householdId, session.user.id, expenseData)
     return NextResponse.json(newExpense, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating expense:", error)
-    console.error("Error details:", error.message)
     return NextResponse.json({ error: "Failed to create expense", details: error.message }, { status: 500 })
   }
 }

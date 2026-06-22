@@ -1,16 +1,17 @@
-import type { Metadata } from 'next'
-import { GeistSans } from 'geist/font/sans'
-import { GeistMono } from 'geist/font/mono'
-import { Analytics } from '@vercel/analytics/next'
-import './globals.css'
+import type { Metadata } from "next"
+import { GeistSans } from "geist/font/sans"
+import { GeistMono } from "geist/font/mono"
+import { Analytics } from "@vercel/analytics/next"
+import { AuthProvider } from "@/components/auth-provider"
+import "./globals.css"
 
 export const metadata: Metadata = {
-  title: 'Control de Gastos',
-  description: 'Aplicación para gestionar gastos fijos, variables y tarjetas de crédito',
-  generator: 'Next.js',
-  manifest: '/manifest.json',
-  themeColor: '#10b981',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+  title: "Control de Gastos",
+  description: "Aplicación para gestionar gastos fijos, variables y tarjetas de crédito",
+  generator: "Next.js",
+  manifest: "/manifest.json",
+  themeColor: "#10b981",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 }
 
 export default function RootLayout({
@@ -40,7 +41,9 @@ export default function RootLayout({
         />
       </head>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} dark:bg-slate-900`}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Analytics />
       </body>
     </html>
