@@ -1,83 +1,108 @@
 import { neon } from "@neondatabase/serverless"
-import { migrateToSpanish } from "./migrate-to-spanish"
-import { addNotesColumn } from "./add-notes-column"
-import { addPaymentCodeColumn } from "./add-payment-code-column"
 
 const sql = neon(process.env.DATABASE_URL!)
 
-export async function initializeDatabase() {
+// Se ejecuta una sola vez por instancia del servidor: guardamos la promesa
+// para no repetir todos los CREATE/ALTER en cada request.
+let initPromise: Promise<void> | null = null
+
+export function initializeDatabase(): Promise<void> {
+  if (!initPromise) {
+    initPromise = runInit().catch((e) => {
+      // Si falla, permitir reintentar en el próximo request
+      initPromise = null
+      throw e
+    })
+  }
+  return initPromise
+}
+
+async function runInit() {
   try {
-    // Check if expenses table exists
-    const result = await sql`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'expenses'
-      );
+    // app_users table
+    await sql`
+      CREATE TABLE IF NOT EXISTS app_users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        name TEXT,
+        image TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
     `
 
-    if (!result[0].exists) {
-      console.log("[v0] Creating expenses table...")
+    // households table
+    await sql`
+      CREATE TABLE IF NOT EXISTS households (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        invite_code TEXT UNIQUE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
 
-      // Create expenses table
-      await sql`
-        CREATE TABLE expenses (
-          id SERIAL PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          description TEXT NOT NULL,
-          amount DECIMAL(10,2) NOT NULL,
-          category TEXT NOT NULL CHECK (category IN ('fijo', 'variable', 'tarjeta')),
-          status TEXT NOT NULL DEFAULT 'pendiente' CHECK (status IN ('pendiente', 'pagado')),
-          due_date DATE NOT NULL,
-          notes TEXT,
-          payment_code TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-      `
+    // household_members table
+    await sql`
+      CREATE TABLE IF NOT EXISTS household_members (
+        user_id TEXT REFERENCES app_users(id) ON DELETE CASCADE,
+        household_id INTEGER REFERENCES households(id) ON DELETE CASCADE,
+        role TEXT DEFAULT 'member',
+        joined_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (user_id, household_id)
+      )
+    `
 
-      // Create indexes
-      await sql`CREATE INDEX idx_expenses_user_id ON expenses(user_id)`
-      await sql`CREATE INDEX idx_expenses_due_date ON expenses(due_date)`
-      await sql`CREATE INDEX idx_expenses_category ON expenses(category)`
+    // expenses table
+    await sql`
+      CREATE TABLE IF NOT EXISTS expenses (
+        id SERIAL PRIMARY KEY,
+        household_id INTEGER REFERENCES households(id) ON DELETE CASCADE,
+        added_by TEXT,
+        description TEXT NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        category TEXT NOT NULL CHECK (category IN ('fijo', 'variable', 'tarjeta')),
+        status TEXT NOT NULL DEFAULT 'pendiente' CHECK (status IN ('pendiente', 'pagado')),
+        due_date DATE NOT NULL,
+        notes TEXT,
+        payment_code TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
 
-      // Insert sample data
-      await sql`
-        INSERT INTO expenses (user_id, description, amount, category, status, due_date) VALUES
-        ('demo-user', 'Caece', 289200.00, 'fijo', 'pagado', '2025-01-01'),
-        ('demo-user', 'Celus dali+ Mtv', 29000.00, 'fijo', 'pagado', '2025-01-01'),
-        ('demo-user', 'ICBC', 512525.69, 'tarjeta', 'pagado', '2025-02-01'),
-        ('demo-user', 'Galicia visa', 62405.99, 'tarjeta', 'pagado', '2025-05-01'),
-        ('demo-user', 'BBVA manu', 89722.09, 'tarjeta', 'pagado', '2025-07-01'),
-        ('demo-user', 'BBVA dali', 580591.72, 'tarjeta', 'pagado', '2025-07-01'),
-        ('demo-user', 'Parquero', 35000.00, 'fijo', 'pagado', '2025-08-01'),
-        ('demo-user', 'Cochera', 70000.00, 'fijo', 'pagado', '2025-10-01'),
-        ('demo-user', 'Internet', 21905.00, 'fijo', 'pendiente', '2025-01-15'),
-        ('demo-user', 'Luz', 30000.00, 'variable', 'pendiente', '2025-01-20'),
-        ('demo-user', 'Country', 217468.59, 'fijo', 'pendiente', '2025-01-25'),
-        ('demo-user', 'Seguro (BBVA D)', 33680.00, 'fijo', 'pendiente', '2025-02-01')
-      `
+    // Add columns to existing expenses table if they don't exist yet
+    await sql`
+      ALTER TABLE expenses
+      ADD COLUMN IF NOT EXISTS household_id INTEGER REFERENCES households(id) ON DELETE CASCADE
+    `.catch(() => {})
 
-      console.log("[v0] Database initialized successfully")
-    } else {
-      // Table exists, check if we need to migrate to Spanish values
-      const sampleData = await sql`SELECT category, status FROM expenses LIMIT 1`
-      if (sampleData.length > 0) {
-        const { category, status } = sampleData[0]
-        if (category === 'fixed' || status === 'paid') {
-          console.log("[v0] Migrating existing data to Spanish values...")
-          await migrateToSpanish()
-        }
-      }
-      
-      // Ensure notes column exists
-      await addNotesColumn()
-      
-      // Ensure payment_code column exists
-      await addPaymentCodeColumn()
-    }
+    await sql`
+      ALTER TABLE expenses
+      ADD COLUMN IF NOT EXISTS added_by TEXT
+    `.catch(() => {})
+
+    // La tabla vieja tenía user_id TEXT NOT NULL — ya no se usa.
+    // Quitamos la restricción NOT NULL para que los nuevos inserts (sin user_id) funcionen.
+    await sql`
+      ALTER TABLE expenses
+      ALTER COLUMN user_id DROP NOT NULL
+    `.catch(() => {})
+
+    // Comprobante de pago (imagen o PDF guardado como data URL en base64)
+    await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_data TEXT`.catch(() => {})
+    await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_name TEXT`.catch(() => {})
+
+    // Factura (imagen o PDF guardado como data URL en base64)
+    await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS invoice_data TEXT`.catch(() => {})
+    await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS invoice_name TEXT`.catch(() => {})
+
+    // Create indexes
+    await sql`CREATE INDEX IF NOT EXISTS idx_expenses_household_id ON expenses(household_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_expenses_due_date ON expenses(due_date)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_households_invite_code ON households(invite_code)`
+
   } catch (error) {
-    console.error("[v0] Error initializing database:", error)
+    console.error("[db] Error initializing database:", error)
     throw error
   }
 }
