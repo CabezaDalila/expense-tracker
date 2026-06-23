@@ -20,6 +20,21 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       if (!account || account.provider !== "google") return false
+
+      // Lista blanca: solo los emails autorizados pueden entrar.
+      // Se configura con ALLOWED_EMAILS (separados por coma). Si está vacío, no se restringe.
+      const allowed = (process.env.ALLOWED_EMAILS || "")
+        .split(",")
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean)
+      if (allowed.length > 0) {
+        const email = user.email?.toLowerCase()
+        if (!email || !allowed.includes(email)) {
+          console.warn("Login bloqueado (email no autorizado):", user.email)
+          return false
+        }
+      }
+
       try {
         await initializeDatabase()
         await sql`
