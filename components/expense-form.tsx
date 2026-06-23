@@ -186,10 +186,10 @@ export function ExpenseForm({ expense, onSubmit, onCancel }: ExpenseFormProps) {
 
       {/* Estado + Fecha en fila */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <Label className="text-sm text-slate-300">Estado</Label>
           <Select value={formData.status} onValueChange={(v: any) => setFormData((p) => ({ ...p, status: v }))}>
-            <SelectTrigger className={inputCls}>
+            <SelectTrigger className={`${inputCls} w-full`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="border-slate-600 bg-slate-800">
@@ -198,14 +198,14 @@ export function ExpenseForm({ expense, onSubmit, onCancel }: ExpenseFormProps) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <Label htmlFor="dueDate" className="text-sm text-slate-300">Vencimiento</Label>
           <Input
             id="dueDate"
             type="date"
             value={formData.due_date}
             onChange={(e) => setFormData((p) => ({ ...p, due_date: e.target.value }))}
-            className={inputCls}
+            className={`${inputCls} w-full min-w-0 block`}
             required
           />
         </div>
