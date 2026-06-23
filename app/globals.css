@@ -290,3 +290,14 @@
   animation: ring-spin 1.1s linear infinite;
 }
 .loading-float { animation: icon-float 2.4s ease-in-out infinite; }
+
+/* Fix iOS: el input de fecha tiene ancho intrínseco y se sale del contenedor */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }

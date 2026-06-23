@@ -90,7 +90,7 @@ export function ExpenseForm({ expense, onSubmit, onCancel }: ExpenseFormProps) {
     "h-11 rounded-xl border-slate-700 bg-slate-800/60 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-blue-500/20"
 
   return (
-    <form onSubmit={handleSubmit} className="no-scrollbar max-h-[65vh] space-y-5 overflow-y-auto pr-1">
+    <form onSubmit={handleSubmit} className="no-scrollbar max-h-[65vh] space-y-5 overflow-y-auto overflow-x-hidden pr-1">
       {/* Descripción */}
       <div className="space-y-1.5">
         <Label htmlFor="description" className="text-sm text-slate-300">Descripción</Label>
