@@ -15,9 +15,10 @@ interface ExpenseDashboardProps {
     upcomingDue: number
   }
   onExpenseClick?: (expense: Expense) => void
+  onNavigateCategory?: (category: string) => void
 }
 
-export function ExpenseDashboard({ expenses, stats, onExpenseClick }: ExpenseDashboardProps) {
+export function ExpenseDashboard({ expenses, stats, onExpenseClick, onNavigateCategory }: ExpenseDashboardProps) {
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(amount)
 
@@ -114,6 +115,7 @@ export function ExpenseDashboard({ expenses, stats, onExpenseClick }: ExpenseDas
           count={fixedCount}
           icon={<DollarSign className="h-5 w-5" />}
           accent="blue"
+          onClick={() => onNavigateCategory?.("fijo")}
         />
         <CategoryCard
           title="Tarjetas"
@@ -121,6 +123,7 @@ export function ExpenseDashboard({ expenses, stats, onExpenseClick }: ExpenseDas
           count={cardCount}
           icon={<CreditCard className="h-5 w-5" />}
           accent="amber"
+          onClick={() => onNavigateCategory?.("tarjeta")}
         />
         <CategoryCard
           title="Gastos Variables"
@@ -128,6 +131,7 @@ export function ExpenseDashboard({ expenses, stats, onExpenseClick }: ExpenseDas
           count={variableCount}
           icon={<TrendingDown className="h-5 w-5" />}
           accent="purple"
+          onClick={() => onNavigateCategory?.("variable")}
         />
       </div>
 
@@ -275,16 +279,24 @@ function CategoryCard({
   count,
   icon,
   accent,
+  onClick,
 }: {
   title: string
   value: string
   count: number
   icon: React.ReactNode
   accent: keyof typeof accentMap
+  onClick?: () => void
 }) {
   const a = accentMap[accent]
   return (
-    <div className={`group relative overflow-hidden rounded-2xl border ${a.ring} bg-slate-800/40 p-5 shadow-lg transition-all hover:bg-slate-800/70`}>
+    <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(e) => { if (onClick && e.key === "Enter") onClick() }}
+      className={`group relative overflow-hidden rounded-2xl border ${a.ring} bg-slate-800/40 p-5 shadow-lg transition-all hover:bg-slate-800/70 ${onClick ? "cursor-pointer" : ""}`}
+    >
       <div className={`pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full ${a.glow} blur-2xl`} />
       <div className="relative">
         <div className="flex items-center justify-between">

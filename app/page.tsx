@@ -66,6 +66,7 @@ export default function ExpenseTracker() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>()
   const [viewingExpense, setViewingExpense] = useState<Expense | undefined>()
+  const [activeTab, setActiveTab] = useState("dashboard")
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null)
@@ -362,7 +363,7 @@ export default function ExpenseTracker() {
         {/* Manager de notificaciones */}
         <NotificationManager userId={session.user?.id ?? ""} />
 
-        <Tabs defaultValue="dashboard" className="space-y-4 sm:space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <TabsList className="grid w-full grid-cols-4 h-auto">
             <TabsTrigger value="dashboard" className="gap-1 sm:gap-2 text-fluid-xs py-2 sm:py-3">
               <Home className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -432,7 +433,7 @@ export default function ExpenseTracker() {
                   </SelectContent>
                 </Select>
               </div>
-              <ExpenseDashboard expenses={expenses} stats={stats} onExpenseClick={setViewingExpense} />
+              <ExpenseDashboard expenses={expenses} stats={stats} onExpenseClick={setViewingExpense} onNavigateCategory={setActiveTab} />
             </div>
           </TabsContent>
 
