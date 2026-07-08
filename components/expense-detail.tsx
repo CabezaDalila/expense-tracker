@@ -21,7 +21,12 @@ export function ExpenseDetail({ expense, onClose, onEdit }: ExpenseDetailProps) 
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(amount)
-  const formatDate = (s: string) => new Date(s).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" })
+  // due_date puede venir como "YYYY-MM-DD" o ISO con hora; parseamos como fecha
+  // LOCAL para evitar el corrimiento UTC → -3h que muestra el día anterior.
+  const formatDate = (s: string) => {
+    const [y, m, d] = s.slice(0, 10).split("-").map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" })
+  }
 
   const viewDoc = async (kind: "receipt" | "invoice") => {
     if (!expense) return

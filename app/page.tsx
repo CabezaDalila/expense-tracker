@@ -34,6 +34,12 @@ export default function ExpenseTracker() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const weekAhead = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+    // due_date puede venir como "YYYY-MM-DD" o ISO con hora; parseamos como fecha
+    // LOCAL para evitar el corrimiento UTC → -3h que muestra el día anterior.
+    const parseLocalDate = (s: string) => {
+      const [y, m, d] = s.slice(0, 10).split("-").map(Number)
+      return new Date(y, m - 1, d)
+    }
     const s = {
       totalExpenses: expenses.length,
       totalPaid: 0,
@@ -51,7 +57,7 @@ export default function ExpenseTracker() {
       else if (e.category === "variable") s.totalVariable += amt
       else if (e.category === "tarjeta") s.totalCards += amt
       if (e.status === "pendiente") {
-        const due = new Date(e.due_date)
+        const due = parseLocalDate(e.due_date)
         if (due >= today && due <= weekAhead) s.upcomingDue++
       }
     }

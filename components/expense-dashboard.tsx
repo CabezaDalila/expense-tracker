@@ -65,10 +65,10 @@ export function ExpenseDashboard({
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-  // due_date viene como "YYYY-MM-DD"; se parsea como fecha LOCAL para no
-  // correrla un día por la conversión a UTC.
+  // due_date viene como "YYYY-MM-DD" (o ISO con hora); se parsea como fecha LOCAL
+  // para no correrla un día por la conversión a UTC.
   const parseLocalDate = (s: string) => {
-    const [y, m, d] = s.split("-").map(Number)
+    const [y, m, d] = s.slice(0, 10).split("-").map(Number)
     return new Date(y, m - 1, d)
   }
   const upcomingExpenses = expenses.filter((e) => {

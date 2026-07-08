@@ -55,7 +55,13 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(amount)
 
-  const formatDate = (s: string) => new Date(s).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })
+  // due_date puede venir como "YYYY-MM-DD" o ISO con hora; parseamos como fecha
+  // LOCAL para evitar el corrimiento UTC → -3h que muestra el día anterior.
+  const parseLocalDate = (s: string) => {
+    const [y, m, d] = s.slice(0, 10).split("-").map(Number)
+    return new Date(y, m - 1, d)
+  }
+  const formatDate = (s: string) => parseLocalDate(s).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })
 
   const handleCopyCode = async () => {
     if (!expense.payment_code) return
@@ -71,7 +77,7 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
   const CategoryIcon = meta.icon
 
   // ¿Está vencido o por vencer?
-  const due = new Date(expense.due_date)
+  const due = parseLocalDate(expense.due_date)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const daysLeft = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))

@@ -43,7 +43,7 @@ export async function getExpenses(householdId: number, year?: string, month?: st
   let rows: Record<string, any>[]
   if (year && month && month !== "all") {
     rows = await sql`
-      SELECT e.id, e.household_id, e.added_by, e.description, e.amount, e.category, e.status, e.due_date, e.notes, e.payment_code, e.receipt_name, (e.receipt_data IS NOT NULL) AS has_receipt, e.invoice_name, (e.invoice_data IS NOT NULL) AS has_invoice, e.created_at, e.updated_at, u.name as added_by_name
+      SELECT e.id, e.household_id, e.added_by, e.description, e.amount, e.category, e.status, TO_CHAR(e.due_date, 'YYYY-MM-DD') AS due_date, e.notes, e.payment_code, e.receipt_name, (e.receipt_data IS NOT NULL) AS has_receipt, e.invoice_name, (e.invoice_data IS NOT NULL) AS has_invoice, e.created_at, e.updated_at, u.name as added_by_name
       FROM expenses e
       LEFT JOIN app_users u ON u.id = e.added_by
       WHERE e.household_id = ${householdId}
@@ -53,7 +53,7 @@ export async function getExpenses(householdId: number, year?: string, month?: st
     `
   } else if (year) {
     rows = await sql`
-      SELECT e.id, e.household_id, e.added_by, e.description, e.amount, e.category, e.status, e.due_date, e.notes, e.payment_code, e.receipt_name, (e.receipt_data IS NOT NULL) AS has_receipt, e.invoice_name, (e.invoice_data IS NOT NULL) AS has_invoice, e.created_at, e.updated_at, u.name as added_by_name
+      SELECT e.id, e.household_id, e.added_by, e.description, e.amount, e.category, e.status, TO_CHAR(e.due_date, 'YYYY-MM-DD') AS due_date, e.notes, e.payment_code, e.receipt_name, (e.receipt_data IS NOT NULL) AS has_receipt, e.invoice_name, (e.invoice_data IS NOT NULL) AS has_invoice, e.created_at, e.updated_at, u.name as added_by_name
       FROM expenses e
       LEFT JOIN app_users u ON u.id = e.added_by
       WHERE e.household_id = ${householdId}
@@ -62,7 +62,7 @@ export async function getExpenses(householdId: number, year?: string, month?: st
     `
   } else {
     rows = await sql`
-      SELECT e.id, e.household_id, e.added_by, e.description, e.amount, e.category, e.status, e.due_date, e.notes, e.payment_code, e.receipt_name, (e.receipt_data IS NOT NULL) AS has_receipt, e.invoice_name, (e.invoice_data IS NOT NULL) AS has_invoice, e.created_at, e.updated_at, u.name as added_by_name
+      SELECT e.id, e.household_id, e.added_by, e.description, e.amount, e.category, e.status, TO_CHAR(e.due_date, 'YYYY-MM-DD') AS due_date, e.notes, e.payment_code, e.receipt_name, (e.receipt_data IS NOT NULL) AS has_receipt, e.invoice_name, (e.invoice_data IS NOT NULL) AS has_invoice, e.created_at, e.updated_at, u.name as added_by_name
       FROM expenses e
       LEFT JOIN app_users u ON u.id = e.added_by
       WHERE e.household_id = ${householdId}
@@ -76,7 +76,7 @@ export async function createExpense(householdId: number, addedBy: string, expens
   const [newExpense] = await sql`
     INSERT INTO expenses (household_id, added_by, description, amount, category, status, due_date, notes, payment_code, receipt_data, receipt_name, invoice_data, invoice_name)
     VALUES (${householdId}, ${addedBy}, ${expense.description}, ${expense.amount}, ${expense.category}, ${expense.status}, ${expense.due_date}, ${expense.notes || null}, ${expense.payment_code || null}, ${expense.receipt_data || null}, ${expense.receipt_name || null}, ${expense.invoice_data || null}, ${expense.invoice_name || null})
-    RETURNING id, household_id, added_by, description, amount, category, status, due_date, notes, payment_code, receipt_name, (receipt_data IS NOT NULL) AS has_receipt, invoice_name, (invoice_data IS NOT NULL) AS has_invoice, created_at, updated_at
+    RETURNING id, household_id, added_by, description, amount, category, status, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, notes, payment_code, receipt_name, (receipt_data IS NOT NULL) AS has_receipt, invoice_name, (invoice_data IS NOT NULL) AS has_invoice, created_at, updated_at
   `
 
   if (expense.category === "fijo" && expense.propagation_months) {
@@ -125,7 +125,7 @@ export async function updateExpense(id: number, householdId: number, expense: Pa
       invoice_name = COALESCE(${expense.invoice_name ?? null}, invoice_name),
       updated_at = NOW()
     WHERE id = ${id} AND household_id = ${householdId}
-    RETURNING id, household_id, added_by, description, amount, category, status, due_date, notes, payment_code, receipt_name, (receipt_data IS NOT NULL) AS has_receipt, invoice_name, (invoice_data IS NOT NULL) AS has_invoice, created_at, updated_at
+    RETURNING id, household_id, added_by, description, amount, category, status, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, notes, payment_code, receipt_name, (receipt_data IS NOT NULL) AS has_receipt, invoice_name, (invoice_data IS NOT NULL) AS has_invoice, created_at, updated_at
   `
   return updatedExpense as Expense
 }
@@ -198,7 +198,7 @@ export async function getExpenseStats(householdId: number, year?: string, month?
 
 export async function getExpiringToday(householdId: number): Promise<Expense[]> {
   const rows = await sql`
-    SELECT e.id, e.household_id, e.added_by, e.description, e.amount, e.category, e.status, e.due_date, e.notes, e.payment_code, e.receipt_name, (e.receipt_data IS NOT NULL) AS has_receipt, e.invoice_name, (e.invoice_data IS NOT NULL) AS has_invoice, e.created_at, e.updated_at, u.name as added_by_name
+    SELECT e.id, e.household_id, e.added_by, e.description, e.amount, e.category, e.status, TO_CHAR(e.due_date, 'YYYY-MM-DD') AS due_date, e.notes, e.payment_code, e.receipt_name, (e.receipt_data IS NOT NULL) AS has_receipt, e.invoice_name, (e.invoice_data IS NOT NULL) AS has_invoice, e.created_at, e.updated_at, u.name as added_by_name
     FROM expenses e
     LEFT JOIN app_users u ON u.id = e.added_by
     WHERE e.household_id = ${householdId}
@@ -211,7 +211,7 @@ export async function getExpiringToday(householdId: number): Promise<Expense[]> 
 
 export async function getExpiringTomorrow(householdId: number): Promise<Expense[]> {
   const rows = await sql`
-    SELECT e.id, e.household_id, e.added_by, e.description, e.amount, e.category, e.status, e.due_date, e.notes, e.payment_code, e.receipt_name, (e.receipt_data IS NOT NULL) AS has_receipt, e.invoice_name, (e.invoice_data IS NOT NULL) AS has_invoice, e.created_at, e.updated_at, u.name as added_by_name
+    SELECT e.id, e.household_id, e.added_by, e.description, e.amount, e.category, e.status, TO_CHAR(e.due_date, 'YYYY-MM-DD') AS due_date, e.notes, e.payment_code, e.receipt_name, (e.receipt_data IS NOT NULL) AS has_receipt, e.invoice_name, (e.invoice_data IS NOT NULL) AS has_invoice, e.created_at, e.updated_at, u.name as added_by_name
     FROM expenses e
     LEFT JOIN app_users u ON u.id = e.added_by
     WHERE e.household_id = ${householdId}
