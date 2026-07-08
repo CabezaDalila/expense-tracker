@@ -16,6 +16,7 @@ import { ExpenseDashboard } from "@/components/expense-dashboard"
 import { ExpenseCard } from "@/components/expense-card"
 import { ExpenseForm } from "@/components/expense-form"
 import { NotificationSettings } from "@/components/notification-settings"
+import { NotificationBell } from "@/components/notification-bell"
 import { InstallPWA } from "@/components/install-pwa"
 import { HouseholdSetup } from "@/components/household-setup"
 import { LoadingScreen } from "@/components/loading-screen"
@@ -298,6 +299,8 @@ export default function ExpenseTracker() {
                 <Plus className="h-5 w-5" />
                 Nuevo Gasto
               </Button>
+
+              <NotificationBell />
 
               {/* User menu */}
               <DropdownMenu>

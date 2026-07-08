@@ -109,12 +109,27 @@ async function runInit() {
       )
     `
 
+    // notification_log: historial de push enviados por usuario, con estado leído.
+    // Se guarda una fila por usuario aunque el push haya ido a varios dispositivos.
+    await sql`
+      CREATE TABLE IF NOT EXISTS notification_log (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        read_at TIMESTAMPTZ
+      )
+    `
+
     // Create indexes
     await sql`CREATE INDEX IF NOT EXISTS idx_expenses_household_id ON expenses(household_id)`
     await sql`CREATE INDEX IF NOT EXISTS idx_expenses_due_date ON expenses(due_date)`
     await sql`CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category)`
     await sql`CREATE INDEX IF NOT EXISTS idx_households_invite_code ON households(invite_code)`
     await sql`CREATE INDEX IF NOT EXISTS idx_push_subs_user_id ON push_subscriptions(user_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_notif_log_user_created ON notification_log(user_id, created_at DESC)`
 
   } catch (error) {
     console.error("[db] Error initializing database:", error)

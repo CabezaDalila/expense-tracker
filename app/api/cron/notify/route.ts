@@ -23,14 +23,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: true, sent: 0, message: "Sin suscripciones" })
     }
 
-    // Para cada suscripción, resolvemos household y gastos pendientes vencidos o
-    // por vencer (mañana incluido). Todos los que quedan pendientes vuelven a
-    // sonar en el próximo cron, hasta que los marquen como pagados.
+    // Agrupar suscripciones por user_id: un usuario puede tener varios dispositivos.
+    const byUser = new Map<string, StoredSubscription[]>()
+    for (const s of subs) {
+      const arr = byUser.get(s.user_id) || []
+      arr.push(s)
+      byUser.set(s.user_id, arr)
+    }
+
     const fmt = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 })
     let sent = 0
-    for (const sub of subs) {
+    for (const [userId, userSubs] of byUser.entries()) {
       const [member] = (await sql`
-        SELECT household_id FROM household_members WHERE user_id = ${sub.user_id} LIMIT 1
+        SELECT household_id FROM household_members WHERE user_id = ${userId} LIMIT 1
       `) as unknown as { household_id: number | null }[]
       const householdId = member?.household_id
       if (!householdId) continue
@@ -71,11 +76,20 @@ export async function GET(request: NextRequest) {
         body = parts.join(" · ")
       }
 
-      const ok = await sendToSubscription(sub, { title, body, url: "/", tag: "expense-reminder" })
-      if (ok) sent++
+      // Log una fila por usuario (aunque tenga varios dispositivos)
+      await sql`
+        INSERT INTO notification_log (user_id, title, body, url)
+        VALUES (${userId}, ${title}, ${body}, ${"/"})
+      `
+
+      // Enviar a cada dispositivo del usuario
+      for (const sub of userSubs) {
+        const ok = await sendToSubscription(sub, { title, body, url: "/", tag: "expense-reminder" })
+        if (ok) sent++
+      }
     }
 
-    return NextResponse.json({ ok: true, subscriptions: subs.length, sent })
+    return NextResponse.json({ ok: true, users: byUser.size, sent })
   } catch (error) {
     console.error("[cron/notify] Error:", error)
     return NextResponse.json({ error: "Error interno" }, { status: 500 })
