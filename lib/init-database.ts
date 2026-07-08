@@ -95,11 +95,26 @@ async function runInit() {
     await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS invoice_data TEXT`.catch(() => {})
     await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS invoice_name TEXT`.catch(() => {})
 
+    // push_subscriptions: cada dispositivo/navegador guarda su suscripción
+    // Web Push (VAPID) para recibir notificaciones aunque la app esté cerrada.
+    await sql`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        user_agent TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+
     // Create indexes
     await sql`CREATE INDEX IF NOT EXISTS idx_expenses_household_id ON expenses(household_id)`
     await sql`CREATE INDEX IF NOT EXISTS idx_expenses_due_date ON expenses(due_date)`
     await sql`CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category)`
     await sql`CREATE INDEX IF NOT EXISTS idx_households_invite_code ON households(invite_code)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_push_subs_user_id ON push_subscriptions(user_id)`
 
   } catch (error) {
     console.error("[db] Error initializing database:", error)

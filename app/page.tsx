@@ -16,7 +16,6 @@ import { ExpenseDashboard } from "@/components/expense-dashboard"
 import { ExpenseCard } from "@/components/expense-card"
 import { ExpenseForm } from "@/components/expense-form"
 import { NotificationSettings } from "@/components/notification-settings"
-import { NotificationManager } from "@/components/notification-manager"
 import { InstallPWA } from "@/components/install-pwa"
 import { HouseholdSetup } from "@/components/household-setup"
 import { LoadingScreen } from "@/components/loading-screen"
@@ -365,9 +364,6 @@ export default function ExpenseTracker() {
             </DialogContent>
           </Dialog>
         </div>
-
-        {/* Manager de notificaciones */}
-        <NotificationManager userId={session.user?.id ?? ""} />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <TabsList className="grid w-full grid-cols-4 h-auto">
