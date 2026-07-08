@@ -387,54 +387,16 @@ export default function ExpenseTracker() {
           </TabsList>
 
           <TabsContent value="dashboard">
-            <div className="space-y-4 sm:space-y-6">
-              {/* Filtro de período */}
-              <div className="flex items-center justify-end gap-2">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <Calendar className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Período</span>
-                </div>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="h-9 w-[120px] rounded-xl border-slate-700 bg-slate-800/60 text-sm font-medium text-white focus:border-blue-500">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-slate-600 bg-slate-800">
-                    {[
-                      { value: "all", label: "Todo el año" },
-                      { value: "01", label: "Enero" },
-                      { value: "02", label: "Febrero" },
-                      { value: "03", label: "Marzo" },
-                      { value: "04", label: "Abril" },
-                      { value: "05", label: "Mayo" },
-                      { value: "06", label: "Junio" },
-                      { value: "07", label: "Julio" },
-                      { value: "08", label: "Agosto" },
-                      { value: "09", label: "Septiembre" },
-                      { value: "10", label: "Octubre" },
-                      { value: "11", label: "Noviembre" },
-                      { value: "12", label: "Diciembre" },
-                    ].map((month) => (
-                      <SelectItem key={month.value} value={month.value} className="text-white hover:bg-slate-700">
-                        {month.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger className="h-9 w-[88px] rounded-xl border-slate-700 bg-slate-800/60 text-sm font-medium text-white focus:border-blue-500">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-slate-600 bg-slate-800">
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
-                      <SelectItem key={year} value={year.toString()} className="text-white hover:bg-slate-700">
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <ExpenseDashboard expenses={expenses} stats={stats} onExpenseClick={setViewingExpense} onNavigateCategory={setActiveTab} />
-            </div>
+            <ExpenseDashboard
+              expenses={expenses}
+              stats={stats}
+              onExpenseClick={setViewingExpense}
+              onNavigateCategory={setActiveTab}
+              selectedMonth={selectedMonth}
+              selectedYear={selectedYear}
+              onMonthChange={setSelectedMonth}
+              onYearChange={setSelectedYear}
+            />
           </TabsContent>
 
           {(["fijo", "tarjeta", "variable"] as const).map((category) => (

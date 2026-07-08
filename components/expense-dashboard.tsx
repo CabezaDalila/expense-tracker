@@ -1,6 +1,7 @@
 "use client"
 
 import { DollarSign, CreditCard, Calendar, AlertTriangle, TrendingUp, TrendingDown, Copy, Wallet, ArrowUpRight } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Expense } from "@/lib/database"
 
 interface ExpenseDashboardProps {
@@ -16,9 +17,38 @@ interface ExpenseDashboardProps {
   }
   onExpenseClick?: (expense: Expense) => void
   onNavigateCategory?: (category: string) => void
+  selectedMonth: string
+  selectedYear: string
+  onMonthChange: (v: string) => void
+  onYearChange: (v: string) => void
 }
 
-export function ExpenseDashboard({ expenses, stats, onExpenseClick, onNavigateCategory }: ExpenseDashboardProps) {
+const MONTH_OPTIONS = [
+  { value: "all", label: "Todo el año" },
+  { value: "01", label: "Enero" },
+  { value: "02", label: "Febrero" },
+  { value: "03", label: "Marzo" },
+  { value: "04", label: "Abril" },
+  { value: "05", label: "Mayo" },
+  { value: "06", label: "Junio" },
+  { value: "07", label: "Julio" },
+  { value: "08", label: "Agosto" },
+  { value: "09", label: "Septiembre" },
+  { value: "10", label: "Octubre" },
+  { value: "11", label: "Noviembre" },
+  { value: "12", label: "Diciembre" },
+] as const
+
+export function ExpenseDashboard({
+  expenses,
+  stats,
+  onExpenseClick,
+  onNavigateCategory,
+  selectedMonth,
+  selectedYear,
+  onMonthChange,
+  onYearChange,
+}: ExpenseDashboardProps) {
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(amount)
 
@@ -57,9 +87,37 @@ export function ExpenseDashboard({ expenses, stats, onExpenseClick, onNavigateCa
         <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-blue-600/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl" />
         <div className="relative">
-          <div className="flex items-center gap-2 text-slate-400">
-            <Wallet className="h-4 w-4" />
-            <span className="text-sm font-medium">Balance del período</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-slate-400">
+              <Wallet className="h-4 w-4" />
+              <span className="text-sm font-medium">Balance del período</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Select value={selectedMonth} onValueChange={onMonthChange}>
+                <SelectTrigger className="h-8 w-[112px] rounded-lg border-slate-600/60 bg-slate-900/40 px-3 text-xs font-medium text-white focus:border-blue-500">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-slate-600 bg-slate-800">
+                  {MONTH_OPTIONS.map((m) => (
+                    <SelectItem key={m.value} value={m.value} className="text-white hover:bg-slate-700">
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedYear} onValueChange={onYearChange}>
+                <SelectTrigger className="h-8 w-[80px] rounded-lg border-slate-600/60 bg-slate-900/40 px-3 text-xs font-medium text-white focus:border-blue-500">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-slate-600 bg-slate-800">
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
+                    <SelectItem key={y} value={y.toString()} className="text-white hover:bg-slate-700">
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="mt-2 text-4xl sm:text-5xl font-bold tracking-tight text-white">{formatCurrency(total)}</div>
           <p className="mt-1 text-sm text-slate-400">{stats.totalExpenses} gastos registrados</p>
