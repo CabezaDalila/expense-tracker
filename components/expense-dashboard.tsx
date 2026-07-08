@@ -1,8 +1,19 @@
 "use client"
 
+import { useState } from "react"
 import { DollarSign, CreditCard, Calendar, AlertTriangle, TrendingUp, TrendingDown, Copy, Wallet, ArrowUpRight } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Expense } from "@/lib/database"
+
+type StatFilter = "paid" | "pending" | "upcoming" | "total"
+
+const STAT_TITLES: Record<StatFilter, string> = {
+  paid: "Gastos pagados",
+  pending: "Gastos pendientes",
+  upcoming: "Por vencer en 7 días",
+  total: "Todos los gastos",
+}
 
 interface ExpenseDashboardProps {
   expenses: Expense[]
@@ -77,6 +88,16 @@ export function ExpenseDashboard({
     return d >= today && d <= nextWeek
   })
 
+  const [statFilter, setStatFilter] = useState<StatFilter | null>(null)
+  const filteredList = (() => {
+    if (!statFilter) return [] as Expense[]
+    if (statFilter === "paid") return expenses.filter((e) => e.status === "pagado")
+    if (statFilter === "pending") return expenses.filter((e) => e.status === "pendiente")
+    if (statFilter === "upcoming") return upcomingExpenses
+    return expenses
+  })()
+  const filteredTotal = filteredList.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+
   const fmtDate = (s: string) =>
     parseLocalDate(s).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })
 
@@ -150,6 +171,7 @@ export function ExpenseDashboard({
           hint={`${paidCount} gastos`}
           icon={<TrendingUp className="h-5 w-5" />}
           accent="emerald"
+          onClick={() => setStatFilter("paid")}
         />
         <StatCard
           label="Pendientes"
@@ -157,6 +179,7 @@ export function ExpenseDashboard({
           hint={`${pendingCount} gastos`}
           icon={<Calendar className="h-5 w-5" />}
           accent="amber"
+          onClick={() => setStatFilter("pending")}
         />
         <StatCard
           label="Por vencer"
@@ -164,6 +187,7 @@ export function ExpenseDashboard({
           hint="próximos 7 días"
           icon={<AlertTriangle className="h-5 w-5" />}
           accent="red"
+          onClick={() => setStatFilter("upcoming")}
         />
         <StatCard
           label="Total gastos"
@@ -171,6 +195,7 @@ export function ExpenseDashboard({
           hint={`${stats.totalExpenses} items`}
           icon={<DollarSign className="h-5 w-5" />}
           accent="blue"
+          onClick={() => setStatFilter("total")}
         />
       </div>
 
@@ -299,6 +324,51 @@ export function ExpenseDashboard({
           )}
         </div>
       </div>
+
+      <Dialog open={statFilter !== null} onOpenChange={(open) => { if (!open) setStatFilter(null) }}>
+        <DialogContent className="max-w-lg border-slate-700 bg-slate-900 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">
+              {statFilter ? STAT_TITLES[statFilter] : ""}
+            </DialogTitle>
+            <p className="text-sm text-slate-400">
+              {filteredList.length} {filteredList.length === 1 ? "gasto" : "gastos"} · {formatCurrency(filteredTotal)}
+            </p>
+          </DialogHeader>
+          <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+            {filteredList.length === 0 && (
+              <p className="py-8 text-center text-sm text-slate-500">No hay gastos en esta categoría.</p>
+            )}
+            {filteredList.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => { setStatFilter(null); onNavigateCategory?.(e.category) }}
+                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-700/40 bg-slate-800/40 px-4 py-3 text-left transition-colors hover:bg-slate-800/70"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-slate-100">{e.description}</p>
+                  <p className="truncate text-xs text-slate-400">
+                    {fmtDate(e.due_date)} · <span className="capitalize">{e.category}</span>
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="text-sm font-semibold text-slate-100">{formatCurrency(e.amount)}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      e.status === "pagado"
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : "bg-amber-500/15 text-amber-300"
+                    }`}
+                  >
+                    {e.status === "pagado" ? "Pagado" : "Pendiente"}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -317,16 +387,24 @@ function StatCard({
   hint,
   icon,
   accent,
+  onClick,
 }: {
   label: string
   value: string
   hint: string
   icon: React.ReactNode
   accent: keyof typeof accentMap
+  onClick?: () => void
 }) {
   const a = accentMap[accent]
   return (
-    <div className={`group relative overflow-hidden rounded-2xl border ${a.ring} bg-slate-800/40 p-4 shadow-lg transition-all hover:bg-slate-800/70`}>
+    <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(e) => { if (onClick && e.key === "Enter") onClick() }}
+      className={`group relative overflow-hidden rounded-2xl border ${a.ring} bg-slate-800/40 p-4 shadow-lg transition-all hover:bg-slate-800/70 ${onClick ? "cursor-pointer" : ""}`}
+    >
       <div className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full ${a.glow} blur-2xl`} />
       <div className="relative">
         <div className="flex items-center justify-between">
