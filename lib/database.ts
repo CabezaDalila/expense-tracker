@@ -108,6 +108,26 @@ export async function createExpense(householdId: number, addedBy: string, expens
   return newExpense as Expense
 }
 
+// Busca un gasto equivalente ya cargado (mismo servicio + monto + vencimiento)
+// para que el ingreso automático por API sea idempotente y no duplique.
+export async function findDuplicateExpense(
+  householdId: number,
+  description: string,
+  amount: number,
+  dueDate: string,
+): Promise<Expense | null> {
+  const rows = await sql`
+    SELECT id, household_id, added_by, description, amount, category, status, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date, notes, payment_code, created_at, updated_at
+    FROM expenses
+    WHERE household_id = ${householdId}
+    AND lower(trim(description)) = lower(trim(${description}))
+    AND amount = ${amount}
+    AND due_date = ${dueDate}
+    LIMIT 1
+  `
+  return (rows[0] as unknown as Expense) ?? null
+}
+
 export async function updateExpense(id: number, householdId: number, expense: Partial<ExpenseInput>): Promise<Expense> {
   const [updatedExpense] = await sql`
     UPDATE expenses

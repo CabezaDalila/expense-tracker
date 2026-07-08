@@ -1,9 +1,34 @@
 import { type NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import { neon } from "@neondatabase/serverless"
+import { timingSafeEqual } from "node:crypto"
 import { initializeDatabase } from "@/lib/init-database"
 
 const sql = neon(process.env.DATABASE_URL!)
+
+// Autenticación para el agente de ingreso automático (Cowork/cron).
+// Si el request trae "Authorization: Bearer <EXPENSE_INGEST_TOKEN>" válido,
+// devuelve el hogar/usuario configurados en variables de entorno.
+// Devuelve null si no está configurado o el token no coincide.
+export function verifyIngestToken(request: Request): { householdId: number; userId: string } | null {
+  const configured = process.env.EXPENSE_INGEST_TOKEN
+  const householdId = process.env.INGEST_HOUSEHOLD_ID
+  const userId = process.env.INGEST_USER_ID
+  if (!configured || !householdId || !userId) return null
+
+  const match = (request.headers.get("authorization") || "").match(/^Bearer\s+(.+)$/i)
+  if (!match) return null
+  const provided = match[1].trim()
+
+  const a = Buffer.from(provided)
+  const b = Buffer.from(configured)
+  if (a.length !== b.length) return null
+  if (!timingSafeEqual(a, b)) return null
+
+  const parsedHousehold = parseInt(householdId, 10)
+  if (Number.isNaN(parsedHousehold)) return null
+  return { householdId: parsedHousehold, userId }
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
