@@ -174,6 +174,39 @@ export function ExpenseDashboard({
         />
       </div>
 
+      {/* ── Próximos vencimientos ── */}
+      {upcomingExpenses.length > 0 && (
+        <div className="overflow-hidden rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-950/40 to-slate-900/60 p-5 sm:p-6 shadow-xl">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400">
+              <AlertTriangle className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="font-semibold text-white">Próximos vencimientos</h3>
+              <p className="text-xs text-slate-400">En los próximos 7 días</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {upcomingExpenses.slice(0, 5).map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => onNavigateCategory?.(e.category)}
+                className="flex w-full items-center justify-between rounded-2xl border border-slate-700/40 bg-slate-800/40 px-4 py-3 text-left transition-colors hover:bg-slate-800/70"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-100">{e.description}</p>
+                  <p className="text-xs text-amber-300/80">Vence {fmtDate(e.due_date)}</p>
+                </div>
+                <span className="shrink-0 rounded-lg bg-amber-500/10 px-3 py-1.5 text-sm font-semibold text-amber-300">
+                  {formatCurrency(e.amount)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Desglose por categoría ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <CategoryCard
@@ -201,39 +234,6 @@ export function ExpenseDashboard({
           onClick={() => onNavigateCategory?.("variable")}
         />
       </div>
-
-      {/* ── Próximos vencimientos ── */}
-      {upcomingExpenses.length > 0 && (
-        <div className="overflow-hidden rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-950/40 to-slate-900/60 p-5 sm:p-6 shadow-xl">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400">
-              <AlertTriangle className="h-5 w-5" />
-            </span>
-            <div>
-              <h3 className="font-semibold text-white">Próximos vencimientos</h3>
-              <p className="text-xs text-slate-400">En los próximos 7 días</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {upcomingExpenses.slice(0, 5).map((e) => (
-              <button
-                key={e.id}
-                type="button"
-                onClick={() => onExpenseClick?.(e)}
-                className="flex w-full items-center justify-between rounded-2xl border border-slate-700/40 bg-slate-800/40 px-4 py-3 text-left transition-colors hover:bg-slate-800/70"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-slate-100">{e.description}</p>
-                  <p className="text-xs text-amber-300/80">Vence {fmtDate(e.due_date)}</p>
-                </div>
-                <span className="shrink-0 rounded-lg bg-amber-500/10 px-3 py-1.5 text-sm font-semibold text-amber-300">
-                  {formatCurrency(e.amount)}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ── Gastos recientes ── */}
       <div className="overflow-hidden rounded-3xl border border-slate-700/40 bg-slate-800/40 p-5 sm:p-6 shadow-xl">
