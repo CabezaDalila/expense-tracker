@@ -149,7 +149,7 @@ export async function getExpenseStats(householdId: number, year?: string, month?
         SUM(CASE WHEN category = 'fijo' THEN amount ELSE 0 END) as total_fixed,
         SUM(CASE WHEN category = 'variable' THEN amount ELSE 0 END) as total_variable,
         SUM(CASE WHEN category = 'tarjeta' THEN amount ELSE 0 END) as total_cards,
-        COUNT(CASE WHEN status = 'pendiente' AND due_date <= CURRENT_DATE + INTERVAL '7 days' THEN 1 END) as upcoming_due
+        COUNT(CASE WHEN status = 'pendiente' AND due_date <= (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date + INTERVAL '7 days' THEN 1 END) as upcoming_due
       FROM expenses
       WHERE household_id = ${householdId}
       AND EXTRACT(YEAR FROM due_date) = ${parseInt(year)}
@@ -164,7 +164,7 @@ export async function getExpenseStats(householdId: number, year?: string, month?
         SUM(CASE WHEN category = 'fijo' THEN amount ELSE 0 END) as total_fixed,
         SUM(CASE WHEN category = 'variable' THEN amount ELSE 0 END) as total_variable,
         SUM(CASE WHEN category = 'tarjeta' THEN amount ELSE 0 END) as total_cards,
-        COUNT(CASE WHEN status = 'pendiente' AND due_date <= CURRENT_DATE + INTERVAL '7 days' THEN 1 END) as upcoming_due
+        COUNT(CASE WHEN status = 'pendiente' AND due_date <= (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date + INTERVAL '7 days' THEN 1 END) as upcoming_due
       FROM expenses
       WHERE household_id = ${householdId}
       AND EXTRACT(YEAR FROM due_date) = ${parseInt(year)}
@@ -178,7 +178,7 @@ export async function getExpenseStats(householdId: number, year?: string, month?
         SUM(CASE WHEN category = 'fijo' THEN amount ELSE 0 END) as total_fixed,
         SUM(CASE WHEN category = 'variable' THEN amount ELSE 0 END) as total_variable,
         SUM(CASE WHEN category = 'tarjeta' THEN amount ELSE 0 END) as total_cards,
-        COUNT(CASE WHEN status = 'pendiente' AND due_date <= CURRENT_DATE + INTERVAL '7 days' THEN 1 END) as upcoming_due
+        COUNT(CASE WHEN status = 'pendiente' AND due_date <= (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date + INTERVAL '7 days' THEN 1 END) as upcoming_due
       FROM expenses
       WHERE household_id = ${householdId}
     `
@@ -203,7 +203,7 @@ export async function getExpiringToday(householdId: number): Promise<Expense[]> 
     LEFT JOIN app_users u ON u.id = e.added_by
     WHERE e.household_id = ${householdId}
     AND e.status = 'pendiente'
-    AND e.due_date = CURRENT_DATE
+    AND e.due_date = (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
     ORDER BY e.amount DESC
   `
   return rows as unknown as Expense[]
@@ -216,7 +216,7 @@ export async function getExpiringTomorrow(householdId: number): Promise<Expense[
     LEFT JOIN app_users u ON u.id = e.added_by
     WHERE e.household_id = ${householdId}
     AND e.status = 'pendiente'
-    AND e.due_date = CURRENT_DATE + INTERVAL '1 day'
+    AND e.due_date = (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date + INTERVAL '1 day'
     ORDER BY e.amount DESC
   `
   return rows as unknown as Expense[]

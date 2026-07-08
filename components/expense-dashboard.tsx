@@ -31,15 +31,24 @@ export function ExpenseDashboard({ expenses, stats, onExpenseClick, onNavigateCa
   const total = stats.totalPaid + stats.totalPending
   const paidPct = total > 0 ? Math.round((stats.totalPaid / total) * 100) : 0
 
+  // Fecha local a medianoche (sin hora) para comparar solo por día
   const today = new Date()
+  today.setHours(0, 0, 0, 0)
   const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+  // due_date viene como "YYYY-MM-DD"; se parsea como fecha LOCAL para no
+  // correrla un día por la conversión a UTC.
+  const parseLocalDate = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number)
+    return new Date(y, m - 1, d)
+  }
   const upcomingExpenses = expenses.filter((e) => {
     if (e.status === "pagado") return false
-    const d = new Date(e.due_date)
+    const d = parseLocalDate(e.due_date)
     return d >= today && d <= nextWeek
   })
 
-  const fmtDate = (s: string) => new Date(s).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })
+  const fmtDate = (s: string) =>
+    parseLocalDate(s).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })
 
   return (
     <div className="space-y-5 sm:space-y-6">
