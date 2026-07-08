@@ -88,7 +88,7 @@ export function NotificationBell() {
         <div className="max-h-[60vh] overflow-y-auto">
           {items.length === 0 && (
             <div className="px-4 py-8 text-center text-sm text-slate-500">
-              Cuando el cron te avise de un gasto, va a aparecer acá.
+              Sin notificaciones por ahora.
             </div>
           )}
           {items.map((n) => (
