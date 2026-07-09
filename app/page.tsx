@@ -57,8 +57,9 @@ export default function ExpenseTracker() {
       else if (e.category === "variable") s.totalVariable += amt
       else if (e.category === "tarjeta") s.totalCards += amt
       if (e.status === "pendiente") {
-        const due = parseLocalDate(e.due_date)
-        if (due >= today && due <= weekAhead) s.upcomingDue++
+        // Incluye los ya vencidos e impagos (due < today), no solo los que
+        // vencen en los próximos 7 días.
+        if (parseLocalDate(e.due_date) <= weekAhead) s.upcomingDue++
       }
     }
     return s
@@ -333,7 +334,7 @@ export default function ExpenseTracker() {
                 Nuevo Gasto
               </Button>
 
-              <NotificationBell />
+              <NotificationBell onNavigate={() => setActiveTab("vencimientos")} />
 
               {/* User menu */}
               <DropdownMenu>

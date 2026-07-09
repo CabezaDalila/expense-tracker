@@ -82,10 +82,11 @@ export function ExpenseDashboard({
     const [y, m, d] = s.slice(0, 10).split("-").map(Number)
     return new Date(y, m - 1, d)
   }
+  // Urgentes = pendientes que vencen dentro de los próximos 7 días O que ya
+  // vencieron y siguen impagos (due_date <= nextWeek, sin cota inferior).
   const upcomingExpenses = expenses.filter((e) => {
     if (e.status === "pagado") return false
-    const d = parseLocalDate(e.due_date)
-    return d >= today && d <= nextWeek
+    return parseLocalDate(e.due_date) <= nextWeek
   })
   const upcomingTotal = upcomingExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
 
@@ -209,7 +210,7 @@ export function ExpenseDashboard({
             </span>
             <div>
               <h3 className="font-semibold text-white">Próximos vencimientos</h3>
-              <p className="text-xs text-slate-400">En los próximos 7 días</p>
+              <p className="text-xs text-slate-400">Vencidos y próximos 7 días</p>
             </div>
           </div>
           <div className="space-y-2">

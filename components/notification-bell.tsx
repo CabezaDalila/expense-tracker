@@ -26,7 +26,7 @@ function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })
 }
 
-export function NotificationBell() {
+export function NotificationBell({ onNavigate }: { onNavigate?: (url: string | null) => void }) {
   const [items, setItems] = useState<NotificationItem[]>([])
   const [unread, setUnread] = useState(0)
   const [open, setOpen] = useState(false)
@@ -92,14 +92,19 @@ export function NotificationBell() {
             </div>
           )}
           {items.map((n) => (
-            <div key={n.id} className="border-b border-slate-700/50 px-4 py-3 last:border-b-0">
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => { setOpen(false); onNavigate?.(n.url) }}
+              className="block w-full border-b border-slate-700/50 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-700/50"
+            >
               <div className="flex items-start justify-between gap-2">
                 <p className="flex-1 text-sm font-medium text-white">{n.title}</p>
                 {!n.read_at && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
               </div>
               <p className="mt-0.5 text-xs text-slate-400">{n.body}</p>
               <p className="mt-1 text-[10px] text-slate-500">{formatRelative(n.created_at)}</p>
-            </div>
+            </button>
           ))}
         </div>
       </DropdownMenuContent>
