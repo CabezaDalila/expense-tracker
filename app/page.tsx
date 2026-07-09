@@ -5,13 +5,12 @@ import { useSession, signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Home, CreditCard, TrendingDown, Calendar, Settings, LogOut, Users, Copy } from "lucide-react"
+import { Plus, Search, Home, Calendar, Settings, LogOut, Users, Copy, Wallet } from "lucide-react"
 import { ExpenseDashboard } from "@/components/expense-dashboard"
 import { ExpenseCard } from "@/components/expense-card"
 import { ExpenseForm } from "@/components/expense-form"
@@ -24,6 +23,13 @@ import { ExpenseDetail } from "@/components/expense-detail"
 import type { Expense, ExpenseInput } from "@/lib/database"
 import { useToast } from "@/hooks/use-toast"
 
+// due_date puede venir como "YYYY-MM-DD" o ISO con hora; parseamos como fecha
+// LOCAL para evitar el corrimiento UTC → -3h que muestra el día anterior.
+const parseLocalDate = (s: string) => {
+  const [y, m, d] = s.slice(0, 10).split("-").map(Number)
+  return new Date(y, m - 1, d)
+}
+
 export default function ExpenseTracker() {
   const { data: session, status, update: updateSession } = useSession()
   const router = useRouter()
@@ -34,12 +40,6 @@ export default function ExpenseTracker() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const weekAhead = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-    // due_date puede venir como "YYYY-MM-DD" o ISO con hora; parseamos como fecha
-    // LOCAL para evitar el corrimiento UTC → -3h que muestra el día anterior.
-    const parseLocalDate = (s: string) => {
-      const [y, m, d] = s.slice(0, 10).split("-").map(Number)
-      return new Date(y, m - 1, d)
-    }
     const s = {
       totalExpenses: expenses.length,
       totalPaid: 0,
@@ -72,7 +72,31 @@ export default function ExpenseTracker() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>()
   const [viewingExpense, setViewingExpense] = useState<Expense | undefined>()
-  const [activeTab, setActiveTab] = useState("dashboard")
+  const [activeTab, setActiveTab] = useState<"dashboard" | "gastos" | "vencimientos">("dashboard")
+
+  // Navegar a la lista unificada de gastos con una categoría preseleccionada
+  const goToCategory = (category: string) => {
+    setFilterCategory(category)
+    setActiveTab("gastos")
+  }
+
+  // Pendientes agrupados por cercanía del vencimiento (para la vista Vencimientos)
+  const dueGroups = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const groups = { vencidos: [] as Expense[], hoy: [] as Expense[], semana: [] as Expense[], luego: [] as Expense[] }
+    const pending = expenses
+      .filter((e) => e.status === "pendiente")
+      .sort((a, b) => a.due_date.localeCompare(b.due_date))
+    for (const e of pending) {
+      const days = Math.round((parseLocalDate(e.due_date).getTime() - today.getTime()) / 86400000)
+      if (days < 0) groups.vencidos.push(e)
+      else if (days === 0) groups.hoy.push(e)
+      else if (days <= 7) groups.semana.push(e)
+      else groups.luego.push(e)
+    }
+    return groups
+  }, [expenses])
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null)
@@ -368,131 +392,194 @@ export default function ExpenseTracker() {
           </Dialog>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-4 h-auto">
-            <TabsTrigger value="dashboard" className="gap-1 sm:gap-2 text-fluid-xs py-2 sm:py-3">
-              <Home className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-              <span className="sm:hidden">Dash</span>
-            </TabsTrigger>
-            <TabsTrigger value="fijo" className="gap-1 sm:gap-2 text-fluid-xs py-2 sm:py-3">
-              <Home className="h-3 w-3 sm:h-4 sm:w-4" />
-              Fijos
-            </TabsTrigger>
-            <TabsTrigger value="tarjeta" className="gap-1 sm:gap-2 text-fluid-xs py-2 sm:py-3">
-              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Tarjetas</span>
-              <span className="sm:hidden">Cards</span>
-            </TabsTrigger>
-            <TabsTrigger value="variable" className="gap-1 sm:gap-2 text-fluid-xs py-2 sm:py-3">
-              <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Variables</span>
-              <span className="sm:hidden">Var</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="dashboard">
+        <div className="space-y-4 sm:space-y-6 pb-24">
+          {activeTab === "dashboard" && (
             <ExpenseDashboard
               expenses={expenses}
               stats={stats}
               onExpenseClick={setViewingExpense}
-              onNavigateCategory={setActiveTab}
+              onNavigateCategory={goToCategory}
               selectedMonth={selectedMonth}
               selectedYear={selectedYear}
               onMonthChange={setSelectedMonth}
               onYearChange={setSelectedYear}
             />
-          </TabsContent>
+          )}
 
-          {(["fijo", "tarjeta", "variable"] as const).map((category) => (
-            <TabsContent key={category} value={category} className="space-y-4 sm:space-y-6">
+          {activeTab === "gastos" && (
+            <div className="space-y-4 sm:space-y-6">
               <div className="space-y-2.5 rounded-2xl border border-slate-700/40 bg-slate-800/30 p-3">
                 <div className="relative">
                   <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                   <Input
-                    placeholder={`Buscar ${category === "fijo" ? "gastos fijos" : category === "tarjeta" ? "tarjetas" : "gastos variables"}...`}
+                    placeholder="Buscar gastos..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="h-10 rounded-xl border-slate-700 bg-slate-900/50 pl-10 text-sm text-white placeholder-slate-500 focus:border-blue-500"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="h-10 min-w-0 rounded-xl border-slate-700 bg-slate-900/50 px-3 text-sm text-white focus:border-blue-500">
-                      <SelectValue placeholder="Estado" />
-                    </SelectTrigger>
-                    <SelectContent className="border-slate-600 bg-slate-800">
-                      <SelectItem value="all" className="text-white hover:bg-slate-700">Todos</SelectItem>
-                      <SelectItem value="pagado" className="text-white hover:bg-slate-700">Pagados</SelectItem>
-                      <SelectItem value="pendiente" className="text-white hover:bg-slate-700">Pendientes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="h-10 min-w-0 rounded-xl border-slate-700 bg-slate-900/50 px-3 text-sm text-white focus:border-blue-500">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="border-slate-600 bg-slate-800">
-                      {[
-                        { value: "all", label: "Todo el año" },
-                        { value: "01", label: "Enero" },
-                        { value: "02", label: "Febrero" },
-                        { value: "03", label: "Marzo" },
-                        { value: "04", label: "Abril" },
-                        { value: "05", label: "Mayo" },
-                        { value: "06", label: "Junio" },
-                        { value: "07", label: "Julio" },
-                        { value: "08", label: "Agosto" },
-                        { value: "09", label: "Septiembre" },
-                        { value: "10", label: "Octubre" },
-                        { value: "11", label: "Noviembre" },
-                        { value: "12", label: "Diciembre" },
-                      ].map((m) => (
-                        <SelectItem key={m.value} value={m.value} className="text-white hover:bg-slate-700">{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedYear} onValueChange={setSelectedYear}>
-                    <SelectTrigger className="h-10 min-w-0 rounded-xl border-slate-700 bg-slate-900/50 px-3 text-sm text-white focus:border-blue-500">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="border-slate-600 bg-slate-800">
-                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
-                        <SelectItem key={year} value={year.toString()} className="text-white hover:bg-slate-700">{year}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="min-w-0 space-y-1">
+                    <span className="px-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">Categoría</span>
+                    <Select value={filterCategory} onValueChange={setFilterCategory}>
+                      <SelectTrigger className="h-10 w-full min-w-0 rounded-xl border-slate-700 bg-slate-900/50 px-3 text-sm text-white focus:border-blue-500">
+                        <SelectValue placeholder="Categoría" />
+                      </SelectTrigger>
+                      <SelectContent className="border-slate-600 bg-slate-800">
+                        <SelectItem value="all" className="text-white hover:bg-slate-700">Todas</SelectItem>
+                        <SelectItem value="fijo" className="text-white hover:bg-slate-700">Fijos</SelectItem>
+                        <SelectItem value="tarjeta" className="text-white hover:bg-slate-700">Tarjetas</SelectItem>
+                        <SelectItem value="variable" className="text-white hover:bg-slate-700">Variables</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <span className="px-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">Estado</span>
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                      <SelectTrigger className="h-10 w-full min-w-0 rounded-xl border-slate-700 bg-slate-900/50 px-3 text-sm text-white focus:border-blue-500">
+                        <SelectValue placeholder="Estado" />
+                      </SelectTrigger>
+                      <SelectContent className="border-slate-600 bg-slate-800">
+                        <SelectItem value="all" className="text-white hover:bg-slate-700">Todos</SelectItem>
+                        <SelectItem value="pagado" className="text-white hover:bg-slate-700">Pagados</SelectItem>
+                        <SelectItem value="pendiente" className="text-white hover:bg-slate-700">Pendientes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <span className="px-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">Mes</span>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger className="h-10 w-full min-w-0 rounded-xl border-slate-700 bg-slate-900/50 px-3 text-sm text-white focus:border-blue-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="border-slate-600 bg-slate-800">
+                        {[
+                          { value: "all", label: "Todo el año" },
+                          { value: "01", label: "Enero" },
+                          { value: "02", label: "Febrero" },
+                          { value: "03", label: "Marzo" },
+                          { value: "04", label: "Abril" },
+                          { value: "05", label: "Mayo" },
+                          { value: "06", label: "Junio" },
+                          { value: "07", label: "Julio" },
+                          { value: "08", label: "Agosto" },
+                          { value: "09", label: "Septiembre" },
+                          { value: "10", label: "Octubre" },
+                          { value: "11", label: "Noviembre" },
+                          { value: "12", label: "Diciembre" },
+                        ].map((m) => (
+                          <SelectItem key={m.value} value={m.value} className="text-white hover:bg-slate-700">{m.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <span className="px-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">Año</span>
+                    <Select value={selectedYear} onValueChange={setSelectedYear}>
+                      <SelectTrigger className="h-10 w-full min-w-0 rounded-xl border-slate-700 bg-slate-900/50 px-3 text-sm text-white focus:border-blue-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="border-slate-600 bg-slate-800">
+                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
+                          <SelectItem key={year} value={year.toString()} className="text-white hover:bg-slate-700">{year}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
+              {/* Resumen de lo filtrado */}
+              <div className="flex items-center justify-between rounded-2xl border border-slate-700/40 bg-slate-800/30 px-4 py-3">
+                <span className="text-sm text-slate-400">
+                  {filteredExpenses.length} {filteredExpenses.length === 1 ? "gasto" : "gastos"}
+                </span>
+                <span className="text-base font-bold text-white">
+                  {new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(
+                    filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
+                  )}
+                </span>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {filteredExpenses
-                  .filter((e) => e.category === category)
-                  .map((expense) => (
-                    <ExpenseCard
-                      key={expense.id}
-                      expense={expense}
-                      onStatusChange={handleStatusChange}
-                      onEdit={handleEditClick}
-                      onDelete={handleDeleteClick}
-                      onView={setViewingExpense}
-                    />
-                  ))}
-                {filteredExpenses.filter((e) => e.category === category).length === 0 && (
+                {filteredExpenses.map((expense) => (
+                  <ExpenseCard
+                    key={expense.id}
+                    expense={expense}
+                    onStatusChange={handleStatusChange}
+                    onEdit={handleEditClick}
+                    onDelete={handleDeleteClick}
+                    onView={setViewingExpense}
+                  />
+                ))}
+                {filteredExpenses.length === 0 && (
                   <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700/60 py-14 text-center">
-                    {category === "fijo" ? (
-                      <Home className="mb-3 h-10 w-10 text-slate-600" />
-                    ) : category === "tarjeta" ? (
-                      <CreditCard className="mb-3 h-10 w-10 text-slate-600" />
-                    ) : (
-                      <TrendingDown className="mb-3 h-10 w-10 text-slate-600" />
-                    )}
-                    <p className="text-slate-300">No hay gastos en esta categoría</p>
+                    <Wallet className="mb-3 h-10 w-10 text-slate-600" />
+                    <p className="text-slate-300">No hay gastos con estos filtros</p>
                     <p className="mt-1 text-sm text-slate-500">Agregalos con el botón "Nuevo Gasto"</p>
                   </div>
                 )}
               </div>
-            </TabsContent>
-          ))}
-        </Tabs>
+            </div>
+          )}
+
+          {activeTab === "vencimientos" && (
+            <div className="space-y-5">
+              {/* Total pendiente del período */}
+              <div className="flex items-center justify-between rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-950/40 to-slate-900/60 px-4 py-3">
+                <span className="text-sm text-slate-300">
+                  {dueGroups.vencidos.length + dueGroups.hoy.length + dueGroups.semana.length + dueGroups.luego.length}{" "}
+                  pendientes en el período
+                </span>
+                <span className="text-base font-bold text-amber-300">
+                  {new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(
+                    [...dueGroups.vencidos, ...dueGroups.hoy, ...dueGroups.semana, ...dueGroups.luego].reduce(
+                      (sum, e) => sum + (Number(e.amount) || 0),
+                      0,
+                    ),
+                  )}
+                </span>
+              </div>
+
+              {(
+                [
+                  { key: "vencidos", title: "Vencidos", items: dueGroups.vencidos, color: "text-red-400" },
+                  { key: "hoy", title: "Vencen hoy", items: dueGroups.hoy, color: "text-amber-400" },
+                  { key: "semana", title: "Próximos 7 días", items: dueGroups.semana, color: "text-blue-400" },
+                  { key: "luego", title: "Más adelante", items: dueGroups.luego, color: "text-slate-400" },
+                ] as const
+              ).map(
+                (section) =>
+                  section.items.length > 0 && (
+                    <div key={section.key} className="space-y-3">
+                      <h3 className={`px-1 text-sm font-semibold uppercase tracking-wide ${section.color}`}>
+                        {section.title} · {section.items.length}
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        {section.items.map((expense) => (
+                          <ExpenseCard
+                            key={expense.id}
+                            expense={expense}
+                            onStatusChange={handleStatusChange}
+                            onEdit={handleEditClick}
+                            onDelete={handleDeleteClick}
+                            onView={setViewingExpense}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ),
+              )}
+
+              {dueGroups.vencidos.length + dueGroups.hoy.length + dueGroups.semana.length + dueGroups.luego.length === 0 && (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700/60 py-14 text-center">
+                  <Calendar className="mb-3 h-10 w-10 text-slate-600" />
+                  <p className="text-slate-300">No tenés pagos pendientes en el período 🎉</p>
+                  <p className="mt-1 text-sm text-slate-500">Todo al día</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Notification settings dialog */}
         <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
@@ -529,6 +616,57 @@ export default function ExpenseTracker() {
 
         <InstallPWA />
       </div>
+
+      {/* ── Barra de navegación fija (footer) ── */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700/60 bg-slate-900/90 backdrop-blur-lg">
+        <div className="mx-auto grid max-w-lg grid-cols-3">
+          <FooterNavButton
+            label="Inicio"
+            icon={<Home className="h-5 w-5" />}
+            active={activeTab === "dashboard"}
+            onClick={() => setActiveTab("dashboard")}
+          />
+          <FooterNavButton
+            label="Gastos"
+            icon={<Wallet className="h-5 w-5" />}
+            active={activeTab === "gastos"}
+            onClick={() => setActiveTab("gastos")}
+          />
+          <FooterNavButton
+            label="Vencimientos"
+            icon={<Calendar className="h-5 w-5" />}
+            active={activeTab === "vencimientos"}
+            onClick={() => setActiveTab("vencimientos")}
+          />
+        </div>
+        {/* Respeta el área segura de iPhone (home indicator) */}
+        <div className="h-[env(safe-area-inset-bottom)]" />
+      </nav>
     </div>
+  )
+}
+
+function FooterNavButton({
+  label,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string
+  icon: React.ReactNode
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1 py-2.5 transition-colors ${
+        active ? "text-blue-400" : "text-slate-400 hover:text-slate-200"
+      }`}
+    >
+      {icon}
+      <span className="text-[11px] font-medium">{label}</span>
+    </button>
   )
 }

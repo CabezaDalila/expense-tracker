@@ -87,6 +87,7 @@ export function ExpenseDashboard({
     const d = parseLocalDate(e.due_date)
     return d >= today && d <= nextWeek
   })
+  const upcomingTotal = upcomingExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
 
   const [statFilter, setStatFilter] = useState<StatFilter | null>(null)
   const filteredList = (() => {
@@ -228,6 +229,12 @@ export function ExpenseDashboard({
                 </span>
               </button>
             ))}
+          </div>
+          <div className="mt-3 flex items-center justify-between border-t border-amber-500/20 pt-3">
+            <span className="text-sm text-slate-400">
+              Total{upcomingExpenses.length > 5 ? ` (${upcomingExpenses.length} gastos)` : ""}
+            </span>
+            <span className="text-base font-bold text-amber-300">{formatCurrency(upcomingTotal)}</span>
           </div>
         </div>
       )}
