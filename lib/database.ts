@@ -150,11 +150,15 @@ export async function updateExpense(id: number, householdId: number, expense: Pa
   return updatedExpense as Expense
 }
 
-export async function deleteExpense(id: number, householdId: number): Promise<void> {
-  await sql`
+// No se pueden borrar gastos pagados: primero hay que volverlos a pendiente.
+// Devuelve false si no borró nada (no existe o está pagado).
+export async function deleteExpense(id: number, householdId: number): Promise<boolean> {
+  const rows = await sql`
     DELETE FROM expenses
-    WHERE id = ${id} AND household_id = ${householdId}
+    WHERE id = ${id} AND household_id = ${householdId} AND status != 'pagado'
+    RETURNING id
   `
+  return rows.length > 0
 }
 
 export async function getExpenseStats(householdId: number, year?: string, month?: string) {

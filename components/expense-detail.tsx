@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Pencil, Copy, Check, FileText, ReceiptText, Download, Loader2, CalendarDays, Tag, CircleDot, User } from "lucide-react"
 import type { Expense } from "@/lib/database"
+import { dataUrlToObjectUrl } from "@/lib/data-url"
 
 interface ExpenseDetailProps {
   expense: Expense | undefined
@@ -17,7 +18,7 @@ const categoryLabels = { fijo: "Gasto fijo", tarjeta: "Tarjeta de crédito", var
 export function ExpenseDetail({ expense, onClose, onEdit }: ExpenseDetailProps) {
   const [copied, setCopied] = useState(false)
   const [loadingDoc, setLoadingDoc] = useState<"receipt" | "invoice" | null>(null)
-  const [doc, setDoc] = useState<{ data: string; name: string; title: string } | null>(null)
+  const [doc, setDoc] = useState<{ data: string; isPdf: boolean; name: string; title: string } | null>(null)
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(amount)
@@ -35,7 +36,11 @@ export function ExpenseDetail({ expense, onClose, onEdit }: ExpenseDetailProps) 
       const res = await fetch(`/api/expenses/${expense.id}/${kind}`)
       if (!res.ok) throw new Error()
       const { data, name } = await res.json()
-      setDoc({ data, name: name || "documento", title: kind === "receipt" ? "Comprobante de pago" : "Factura" })
+      // Blob URL en vez del data URL directo: Chrome deja en blanco los
+      // data: URLs de más de ~2 MB en iframes.
+      const isPdf = data.startsWith("data:application/pdf")
+      const url = dataUrlToObjectUrl(data)
+      setDoc({ data: url, isPdf, name: name || "documento", title: kind === "receipt" ? "Comprobante de pago" : "Factura" })
     } catch {
       /* noop */
     } finally {
@@ -43,7 +48,12 @@ export function ExpenseDetail({ expense, onClose, onEdit }: ExpenseDetailProps) 
     }
   }
 
-  const docIsPdf = doc?.data?.startsWith("data:application/pdf")
+  const closeDoc = () => {
+    if (doc) URL.revokeObjectURL(doc.data)
+    setDoc(null)
+  }
+
+  const docIsPdf = doc?.isPdf
   const isPaid = expense?.status === "pagado"
 
   return (
@@ -138,7 +148,7 @@ export function ExpenseDetail({ expense, onClose, onEdit }: ExpenseDetailProps) 
       </Dialog>
 
       {/* Visor de documento */}
-      <Dialog open={!!doc} onOpenChange={(open) => !open && setDoc(null)}>
+      <Dialog open={!!doc} onOpenChange={(open) => !open && closeDoc()}>
         <DialogContent className="!w-[calc(100vw-2rem)] !max-w-2xl !left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2 border-slate-700 bg-slate-900 p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-white">
@@ -146,9 +156,11 @@ export function ExpenseDetail({ expense, onClose, onEdit }: ExpenseDetailProps) 
               {doc?.title}
             </DialogTitle>
           </DialogHeader>
-          <div className="max-h-[70vh] overflow-auto rounded-xl bg-slate-950/60 p-2">
+          {/* El PDF scrollea dentro de su propio visor; solo las imágenes
+              necesitan scroll del contenedor. Así no hay doble scrollbar. */}
+          <div className={docIsPdf ? "overflow-hidden rounded-xl" : "max-h-[70vh] overflow-auto rounded-xl bg-slate-950/60 p-2"}>
             {doc && (docIsPdf ? (
-              <iframe src={doc.data} className="h-[70vh] w-full rounded-lg border-0" title={doc.title} />
+              <iframe src={doc.data} className="block h-[70vh] w-full border-0" title={doc.title} />
             ) : (
               <img src={doc.data} alt={doc.title} className="mx-auto h-auto max-w-full rounded-lg" />
             ))}

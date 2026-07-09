@@ -259,6 +259,15 @@ export default function ExpenseTracker() {
         setDeleteDialogOpen(false)
         setExpenseToDelete(null)
         toast({ title: "Gasto eliminado", description: `${expenseToDelete.description} eliminado.` })
+      } else {
+        const body = await response.json().catch(() => null)
+        setDeleteDialogOpen(false)
+        setExpenseToDelete(null)
+        toast({
+          title: "No se pudo eliminar",
+          description: body?.error || "Intentá de nuevo.",
+          variant: "destructive",
+        })
       }
     } catch {
       toast({ title: "Error", description: "No se pudo eliminar el gasto.", variant: "destructive" })

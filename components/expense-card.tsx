@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { CreditCard, DollarSign, TrendingDown, Check, Copy, Trash2, Pencil, Clock, CheckCircle2, FileText, ReceiptText, Download, Loader2 } from "lucide-react"
 import { useState } from "react"
 import type { Expense } from "@/lib/database"
+import { dataUrlToObjectUrl } from "@/lib/data-url"
 
 interface ExpenseCardProps {
   expense: Expense
@@ -23,7 +24,7 @@ const categoryMeta = {
 export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView }: ExpenseCardProps) {
   const [copied, setCopied] = useState(false)
   const [loadingDoc, setLoadingDoc] = useState<"receipt" | "invoice" | null>(null)
-  const [doc, setDoc] = useState<{ data: string; name: string; title: string } | null>(null)
+  const [doc, setDoc] = useState<{ data: string; isPdf: boolean; name: string; title: string } | null>(null)
   const [changingStatus, setChangingStatus] = useState(false)
 
   const handleStatusToggle = async (status: Expense["status"]) => {
@@ -42,7 +43,11 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
       const res = await fetch(`/api/expenses/${expense.id}/${kind}`)
       if (!res.ok) throw new Error()
       const { data, name } = await res.json()
-      setDoc({ data, name: name || "documento", title: kind === "receipt" ? "Comprobante de pago" : "Factura" })
+      // Blob URL en vez del data URL directo: Chrome deja en blanco los
+      // data: URLs de más de ~2 MB en iframes.
+      const isPdf = data.startsWith("data:application/pdf")
+      const url = dataUrlToObjectUrl(data)
+      setDoc({ data: url, isPdf, name: name || "documento", title: kind === "receipt" ? "Comprobante de pago" : "Factura" })
     } catch {
       // silencio: si falla, no rompe la tarjeta
     } finally {
@@ -50,7 +55,12 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
     }
   }
 
-  const docIsPdf = doc?.data?.startsWith("data:application/pdf")
+  const closeDoc = () => {
+    if (doc) URL.revokeObjectURL(doc.data)
+    setDoc(null)
+  }
+
+  const docIsPdf = doc?.isPdf
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(amount)
@@ -166,9 +176,11 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
         </div>
       )}
 
-      {/* Acciones */}
-      <div className="mt-4 flex items-center gap-2">
-        {!isPaid && (
+      {/* Acciones — solo para gastos pendientes. Un gasto pagado queda
+          "cerrado": no se edita ni se borra desde la card. Si se marcó
+          pagado por error, se revierte desde Detalle → Editar gasto. */}
+      {!isPaid && (
+        <div className="mt-4 flex items-center gap-2">
           <Button
             size="sm"
             disabled={changingStatus}
@@ -181,45 +193,30 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
               <span className="flex items-center gap-1.5"><Check className="h-4 w-4" /> Marcar pagado</span>
             )}
           </Button>
-        )}
-        {isPaid && (
           <Button
             size="sm"
             variant="outline"
-            disabled={changingStatus}
-            onClick={(e) => { e.stopPropagation(); handleStatusToggle("pendiente") }}
-            className="flex-1 rounded-lg border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-60"
+            onClick={(e) => { e.stopPropagation(); onEdit(expense) }}
+            className="rounded-lg border-slate-700 bg-slate-800/60 px-3 text-slate-300 hover:bg-slate-700 hover:text-white"
+            title="Editar"
           >
-            {changingStatus ? (
-              <span className="flex items-center gap-1.5"><Loader2 className="h-4 w-4 animate-spin" /> Guardando...</span>
-            ) : (
-              "Marcar pendiente"
-            )}
+            <Pencil className="h-4 w-4" />
           </Button>
-        )}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => { e.stopPropagation(); onEdit(expense) }}
-          className="rounded-lg border-slate-700 bg-slate-800/60 px-3 text-slate-300 hover:bg-slate-700 hover:text-white"
-          title="Editar"
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => { e.stopPropagation(); onDelete(expense.id) }}
-          className="rounded-lg border-slate-700 bg-slate-800/60 px-3 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-          title="Eliminar"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => { e.stopPropagation(); onDelete(expense.id) }}
+            className="rounded-lg border-slate-700 bg-slate-800/60 px-3 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+            title="Eliminar"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
 
     {/* Modal de visualización del documento */}
-    <Dialog open={!!doc} onOpenChange={(open) => !open && setDoc(null)}>
+    <Dialog open={!!doc} onOpenChange={(open) => !open && closeDoc()}>
       <DialogContent className="!w-[calc(100vw-2rem)] !max-w-2xl !left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2 border-slate-700 bg-slate-900 p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white">
@@ -227,9 +224,11 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
             {doc?.title}
           </DialogTitle>
         </DialogHeader>
-        <div className="max-h-[70vh] overflow-auto rounded-xl bg-slate-950/60 p-2">
+        {/* El PDF scrollea dentro de su propio visor; solo las imágenes
+            necesitan scroll del contenedor. Así no hay doble scrollbar. */}
+        <div className={docIsPdf ? "overflow-hidden rounded-xl" : "max-h-[70vh] overflow-auto rounded-xl bg-slate-950/60 p-2"}>
           {doc && (docIsPdf ? (
-            <iframe src={doc.data} className="h-[70vh] w-full rounded-lg border-0" title={doc.title} />
+            <iframe src={doc.data} className="block h-[70vh] w-full border-0" title={doc.title} />
           ) : (
             <img src={doc.data} alt={doc.title} className="mx-auto h-auto max-w-full rounded-lg" />
           ))}
