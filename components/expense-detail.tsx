@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Pencil, Copy, Check, FileText, ReceiptText, Download, Loader2, CalendarDays, Tag, CircleDot, User } from "lucide-react"
+import { Pencil, Copy, Check, FileText, ReceiptText, Download, Loader2, CalendarDays, Tag, CircleDot, User, Trash2 } from "lucide-react"
 import type { Expense } from "@/lib/database"
 import { dataUrlToObjectUrl } from "@/lib/data-url"
 
@@ -11,11 +11,12 @@ interface ExpenseDetailProps {
   expense: Expense | undefined
   onClose: () => void
   onEdit: (expense: Expense) => void
+  onDelete: (expense: Expense) => void
 }
 
 const categoryLabels = { fijo: "Gasto fijo", tarjeta: "Tarjeta de crédito", variable: "Gasto variable" } as const
 
-export function ExpenseDetail({ expense, onClose, onEdit }: ExpenseDetailProps) {
+export function ExpenseDetail({ expense, onClose, onEdit, onDelete }: ExpenseDetailProps) {
   const [copied, setCopied] = useState(false)
   const [loadingDoc, setLoadingDoc] = useState<"receipt" | "invoice" | null>(null)
   const [doc, setDoc] = useState<{ data: string; isPdf: boolean; name: string; title: string } | null>(null)
@@ -135,13 +136,22 @@ export function ExpenseDetail({ expense, onClose, onEdit }: ExpenseDetailProps) 
                 </div>
               )}
 
-              {/* Editar */}
-              <Button
-                onClick={() => onEdit(expense)}
-                className="w-full gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 py-5 font-semibold text-white hover:from-blue-500 hover:to-blue-600"
-              >
-                <Pencil className="h-4 w-4" /> Editar gasto
-              </Button>
+              {/* Acciones */}
+              <div className="space-y-2">
+                <Button
+                  onClick={() => onEdit(expense)}
+                  className="w-full gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 py-5 font-semibold text-white hover:from-blue-500 hover:to-blue-600"
+                >
+                  <Pencil className="h-4 w-4" /> Editar gasto
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => onDelete(expense)}
+                  className="w-full gap-2 rounded-xl py-4 font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                >
+                  <Trash2 className="h-4 w-4" /> Eliminar gasto
+                </Button>
+              </div>
             </>
           )}
         </DialogContent>

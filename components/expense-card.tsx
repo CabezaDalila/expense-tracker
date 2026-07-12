@@ -1,11 +1,9 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { CreditCard, DollarSign, TrendingDown, Check, Copy, Trash2, Pencil, Clock, CheckCircle2, FileText, ReceiptText, Download, Loader2 } from "lucide-react"
+import { CreditCard, DollarSign, TrendingDown, Check, Copy, Trash2, Pencil, Clock, CheckCircle2, Loader2 } from "lucide-react"
 import { useState } from "react"
 import type { Expense } from "@/lib/database"
-import { dataUrlToObjectUrl } from "@/lib/data-url"
 
 interface ExpenseCardProps {
   expense: Expense
@@ -23,8 +21,6 @@ const categoryMeta = {
 
 export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView }: ExpenseCardProps) {
   const [copied, setCopied] = useState(false)
-  const [loadingDoc, setLoadingDoc] = useState<"receipt" | "invoice" | null>(null)
-  const [doc, setDoc] = useState<{ data: string; isPdf: boolean; name: string; title: string } | null>(null)
   const [changingStatus, setChangingStatus] = useState(false)
 
   const handleStatusToggle = async (status: Expense["status"]) => {
@@ -36,31 +32,6 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
       setChangingStatus(false)
     }
   }
-
-  const handleViewDoc = async (kind: "receipt" | "invoice") => {
-    setLoadingDoc(kind)
-    try {
-      const res = await fetch(`/api/expenses/${expense.id}/${kind}`)
-      if (!res.ok) throw new Error()
-      const { data, name } = await res.json()
-      // Blob URL en vez del data URL directo: Chrome deja en blanco los
-      // data: URLs de más de ~2 MB en iframes.
-      const isPdf = data.startsWith("data:application/pdf")
-      const url = dataUrlToObjectUrl(data)
-      setDoc({ data: url, isPdf, name: name || "documento", title: kind === "receipt" ? "Comprobante de pago" : "Factura" })
-    } catch {
-      // silencio: si falla, no rompe la tarjeta
-    } finally {
-      setLoadingDoc(null)
-    }
-  }
-
-  const closeDoc = () => {
-    if (doc) URL.revokeObjectURL(doc.data)
-    setDoc(null)
-  }
-
-  const docIsPdf = doc?.isPdf
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(amount)
@@ -95,7 +66,6 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
   const soon = !isPaid && daysLeft >= 0 && daysLeft <= 3
 
   return (
-    <>
     <div
       onClick={() => onView?.(expense)}
       className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-slate-800/40 p-5 shadow-lg transition-all hover:bg-slate-800/70 ${
@@ -137,8 +107,6 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
         <p className="mt-1 text-xs text-slate-500">Agregado por {expense.added_by_name}</p>
       )}
 
-      {expense.notes && <p className="mt-2 text-sm italic text-slate-400">{expense.notes}</p>}
-
       {/* Código de pago */}
       {expense.payment_code && (
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-slate-700/40 bg-slate-900/40 px-3 py-2">
@@ -150,35 +118,9 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
         </div>
       )}
 
-      {/* Documentos adjuntos */}
-      {(expense.has_receipt || expense.has_invoice) && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {expense.has_receipt && (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleViewDoc("receipt") }}
-              disabled={loadingDoc !== null}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs font-medium text-blue-300 transition-colors hover:bg-blue-500/10 disabled:opacity-50"
-            >
-              {loadingDoc === "receipt" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-              {loadingDoc === "receipt" ? "Abriendo..." : "Comprobante"}
-            </button>
-          )}
-          {expense.has_invoice && (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleViewDoc("invoice") }}
-              disabled={loadingDoc !== null}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-purple-500/20 bg-purple-500/5 px-3 py-2 text-xs font-medium text-purple-300 transition-colors hover:bg-purple-500/10 disabled:opacity-50"
-            >
-              {loadingDoc === "invoice" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ReceiptText className="h-3.5 w-3.5" />}
-              {loadingDoc === "invoice" ? "Abriendo..." : "Factura"}
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Acciones — solo para gastos pendientes. Un gasto pagado queda
-          "cerrado": no se edita ni se borra desde la card. Si se marcó
-          pagado por error, se revierte desde Detalle → Editar gasto. */}
+          "cerrado": no se edita ni se borra desde la card. Notas y adjuntos
+          se ven solo en el detalle (tocando la tarjeta). */}
       {!isPaid && (
         <div className="mt-4 flex items-center gap-2">
           <Button
@@ -214,37 +156,5 @@ export function ExpenseCard({ expense, onStatusChange, onEdit, onDelete, onView 
         </div>
       )}
     </div>
-
-    {/* Modal de visualización del documento */}
-    <Dialog open={!!doc} onOpenChange={(open) => !open && closeDoc()}>
-      <DialogContent className="!w-[calc(100vw-2rem)] !max-w-2xl !left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2 border-slate-700 bg-slate-900 p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-white">
-            <FileText className="h-5 w-5 text-blue-400" />
-            {doc?.title}
-          </DialogTitle>
-        </DialogHeader>
-        {/* El PDF scrollea dentro de su propio visor; solo las imágenes
-            necesitan scroll del contenedor. Así no hay doble scrollbar. */}
-        <div className={docIsPdf ? "overflow-hidden rounded-xl" : "max-h-[70vh] overflow-auto rounded-xl bg-slate-950/60 p-2"}>
-          {doc && (docIsPdf ? (
-            <iframe src={doc.data} className="block h-[70vh] w-full border-0" title={doc.title} />
-          ) : (
-            <img src={doc.data} alt={doc.title} className="mx-auto h-auto max-w-full rounded-lg" />
-          ))}
-        </div>
-        {doc && (
-          <a
-            href={doc.data}
-            download={doc.name}
-            className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-700"
-          >
-            <Download className="h-4 w-4" />
-            Descargar
-          </a>
-        )}
-      </DialogContent>
-    </Dialog>
-    </>
   )
 }

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Home, CreditCard, TrendingDown, Repeat, Paperclip, FileText, X, Loader2 } from "lucide-react"
+import { Home, CreditCard, TrendingDown, Repeat, Paperclip, FileText, X, Loader2, ChevronDown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Expense, ExpenseInput } from "@/lib/database"
 
@@ -43,6 +43,11 @@ export function ExpenseForm({ expense, onSubmit, onCancel }: ExpenseFormProps) {
   const [receipt, setReceipt] = useState<{ data: string | null; name: string | null }>({ data: null, name: null })
   const [invoice, setInvoice] = useState<{ data: string | null; name: string | null }>({ data: null, name: null })
   const [submitting, setSubmitting] = useState(false)
+  // Sección secundaria colapsada: mantiene el form corto en el celu. Se abre
+  // sola al editar un gasto que ya tiene notas / código / adjuntos cargados.
+  const [showDetails, setShowDetails] = useState(
+    !!(expense && (expense.notes || expense.payment_code || expense.has_receipt || expense.has_invoice)),
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -211,48 +216,66 @@ export function ExpenseForm({ expense, onSubmit, onCancel }: ExpenseFormProps) {
         </div>
       </div>
 
-      {/* Notas */}
-      <div className="space-y-1.5">
-        <Label htmlFor="notes" className="text-sm text-slate-300">Notas <span className="text-slate-500">(opcional)</span></Label>
-        <Textarea
-          id="notes"
-          value={formData.notes}
-          onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
-          placeholder="Notas adicionales..."
-          rows={2}
-          className="rounded-xl border-slate-700 bg-slate-800/60 text-white placeholder-slate-500 focus:border-blue-500"
-        />
-      </div>
+      {/* Más detalles — colapsable. Notas, código y adjuntos son secundarios:
+          se ocultan por defecto para que el form entre sin scrollear tanto. */}
+      <button
+        type="button"
+        onClick={() => setShowDetails((v) => !v)}
+        className="flex w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-800/40 px-4 py-3 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800/70"
+      >
+        <span className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-slate-400" />
+          Más detalles <span className="text-slate-500">(notas, código, adjuntos)</span>
+        </span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
+      </button>
 
-      {/* Código de pago */}
-      <div className="space-y-1.5">
-        <Label htmlFor="payment_code" className="text-sm text-slate-300">Código de pago <span className="text-slate-500">(opcional)</span></Label>
-        <Input
-          id="payment_code"
-          value={formData.payment_code}
-          onChange={(e) => setFormData((p) => ({ ...p, payment_code: e.target.value }))}
-          placeholder="CBU, Alias, QR..."
-          className={inputCls}
-        />
-      </div>
+      {showDetails && (
+        <>
+          {/* Notas */}
+          <div className="space-y-1.5">
+            <Label htmlFor="notes" className="text-sm text-slate-300">Notas <span className="text-slate-500">(opcional)</span></Label>
+            <Textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
+              placeholder="Notas adicionales..."
+              rows={2}
+              className="rounded-xl border-slate-700 bg-slate-800/60 text-white placeholder-slate-500 focus:border-blue-500"
+            />
+          </div>
 
-      {/* Adjuntos */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <AttachmentField
-          label="Comprobante de pago"
-          value={receipt}
-          onChange={setReceipt}
-          hasExisting={!!expense?.has_receipt}
-          onTooBig={() => toast({ title: "Archivo muy grande", description: `No puede superar ${MAX_RECEIPT_MB} MB.`, variant: "destructive" })}
-        />
-        <AttachmentField
-          label="Factura"
-          value={invoice}
-          onChange={setInvoice}
-          hasExisting={!!expense?.has_invoice}
-          onTooBig={() => toast({ title: "Archivo muy grande", description: `No puede superar ${MAX_RECEIPT_MB} MB.`, variant: "destructive" })}
-        />
-      </div>
+          {/* Código de pago */}
+          <div className="space-y-1.5">
+            <Label htmlFor="payment_code" className="text-sm text-slate-300">Código de pago <span className="text-slate-500">(opcional)</span></Label>
+            <Input
+              id="payment_code"
+              value={formData.payment_code}
+              onChange={(e) => setFormData((p) => ({ ...p, payment_code: e.target.value }))}
+              placeholder="CBU, Alias, QR..."
+              className={inputCls}
+            />
+          </div>
+
+          {/* Adjuntos */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <AttachmentField
+              label="Comprobante de pago"
+              value={receipt}
+              onChange={setReceipt}
+              hasExisting={!!expense?.has_receipt}
+              onTooBig={() => toast({ title: "Archivo muy grande", description: `No puede superar ${MAX_RECEIPT_MB} MB.`, variant: "destructive" })}
+            />
+            <AttachmentField
+              label="Factura"
+              value={invoice}
+              onChange={setInvoice}
+              hasExisting={!!expense?.has_invoice}
+              onTooBig={() => toast({ title: "Archivo muy grande", description: `No puede superar ${MAX_RECEIPT_MB} MB.`, variant: "destructive" })}
+            />
+          </div>
+        </>
+      )}
 
       {/* Botones */}
       <div className="flex gap-3 pt-2">

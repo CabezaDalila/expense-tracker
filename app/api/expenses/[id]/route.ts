@@ -31,10 +31,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     const expenseId = Number.parseInt(params.id)
     const deleted = await deleteExpense(expenseId, session.user.householdId)
     if (!deleted) {
-      return NextResponse.json(
-        { error: "No se puede eliminar: el gasto está pagado o no existe" },
-        { status: 409 },
-      )
+      return NextResponse.json({ error: "El gasto no existe" }, { status: 404 })
     }
     return NextResponse.json({ success: true })
   } catch (error) {

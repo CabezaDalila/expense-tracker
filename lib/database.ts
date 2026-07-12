@@ -155,7 +155,7 @@ export async function updateExpense(id: number, householdId: number, expense: Pa
 export async function deleteExpense(id: number, householdId: number): Promise<boolean> {
   const rows = await sql`
     DELETE FROM expenses
-    WHERE id = ${id} AND household_id = ${householdId} AND status != 'pagado'
+    WHERE id = ${id} AND household_id = ${householdId}
     RETURNING id
   `
   return rows.length > 0

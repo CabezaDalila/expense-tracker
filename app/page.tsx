@@ -259,6 +259,7 @@ export default function ExpenseTracker() {
         await loadExpenses(selectedYear, selectedMonth)
         setDeleteDialogOpen(false)
         setExpenseToDelete(null)
+        if (editingExpense?.id === expenseToDelete.id) handleCloseForm()
         toast({ title: "Gasto eliminado", description: `${expenseToDelete.description} eliminado.` })
       } else {
         const body = await response.json().catch(() => null)
@@ -385,6 +386,7 @@ export default function ExpenseTracker() {
             expense={viewingExpense}
             onClose={() => setViewingExpense(undefined)}
             onEdit={(exp) => { setViewingExpense(undefined); handleEditClick(exp) }}
+            onDelete={(exp) => { setViewingExpense(undefined); handleDeleteClick(exp.id) }}
           />
 
           {/* Modal del formulario (controlado) */}
